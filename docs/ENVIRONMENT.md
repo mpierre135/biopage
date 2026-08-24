@@ -59,7 +59,7 @@ Redirect URLs to allowlist on each developer app:
 Platform apps already created for this repo:
 
 - Shopify Dev Dashboard: org `98541073`, app `414698831873` ([settings](https://dev.shopify.com/dashboard/98541073/apps/414698831873/settings)). Redirects include production (`biopage-rudy-pierres-projects.vercel.app`, `biopage-seven.vercel.app`) and local (`http://localhost:3000` / `3002`) callbacks. Scope: `read_products`.
-- Meta Developer app: **BioHub** `944004617992154` ([dashboard](https://developers.facebook.com/apps/944004617992154/)). Add Valid OAuth Redirect URIs for `/api/integrations/meta/callback` on those same hosts, then put `META_APP_SECRET` in `.env.local` and Vercel.
+- Meta Developer app: **BioHub** `944004617992154` ([dashboard](https://developers.facebook.com/apps/944004617992154/), [Login settings](https://developers.facebook.com/apps/944004617992154/business-login/settings/)). `META_APP_ID` / `META_APP_SECRET` are in `.env.local` and Vercel. Valid OAuth Redirect URIs: `https://biopage-rudy-pierres-projects.vercel.app/api/integrations/meta/callback` and `https://biopage-seven.vercel.app/api/integrations/meta/callback`. Meta Enforce HTTPS is on, so `http://localhost` callbacks are rejected — test **Connect Facebook** on a Vercel URL. App is in development mode (admins/testers only until App Review).
 
 | Variable | Description |
 |---|---|
