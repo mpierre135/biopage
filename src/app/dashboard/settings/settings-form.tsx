@@ -13,16 +13,19 @@ import { updateProfile } from "@/lib/actions/profile";
 export function SettingsForm({
   profileId,
   canRemoveBranding,
+  canCustomDomain,
   initial,
 }: {
   profileId: string;
   canRemoveBranding: boolean;
+  canCustomDomain: boolean;
   initial: {
     displayName: string;
     bio: string;
     location: string;
     seoTitle: string;
     seoDescription: string;
+    customDomain: string;
     isPublished: boolean;
     showBranding: boolean;
     visibility: "public" | "unlisted" | "private";
@@ -39,6 +42,7 @@ export function SettingsForm({
         location: form.location,
         seoTitle: form.seoTitle,
         seoDescription: form.seoDescription,
+        customDomain: canCustomDomain ? form.customDomain : "",
         isPublished: form.isPublished,
         showBranding: canRemoveBranding ? form.showBranding : true,
         visibility: form.visibility,
@@ -78,6 +82,25 @@ export function SettingsForm({
           )}
         </div>
       ))}
+
+      <div className="space-y-2">
+        <Label htmlFor="customDomain">Custom domain</Label>
+        <Input
+          id="customDomain"
+          placeholder="links.yourbrand.com"
+          value={form.customDomain}
+          disabled={!canCustomDomain}
+          onChange={(e) =>
+            setForm((f) => ({ ...f, customDomain: e.target.value }))
+          }
+          className="min-h-11"
+        />
+        <p className="text-xs text-muted-foreground">
+          {canCustomDomain
+            ? "Point a CNAME to your BioHub host, then enter the hostname here."
+            : "Upgrade to Creator to connect a custom domain."}
+        </p>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="visibility">Visibility</Label>

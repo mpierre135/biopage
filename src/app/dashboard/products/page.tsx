@@ -1,13 +1,14 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { ShoppingBag, DollarSign, Package } from "lucide-react";
 import { db } from "@/lib/db";
-import { profiles, products } from "@/lib/db/schema";
+import { digitalFiles, profiles, products } from "@/lib/db/schema";
 import { getCurrentDbUser } from "@/lib/auth/session";
 import { canUseFeature } from "@/lib/billing/entitlements";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AddProductButton } from "./add-product-button";
+import { ProductFileAttach } from "./product-file-attach";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -33,6 +34,26 @@ export default async function ProductsPage() {
     .where(eq(products.profileId, profile.id))
     .orderBy(desc(products.createdAt))
     .limit(50);
+
+  const files =
+    productList.length === 0
+      ? []
+      : await db
+          .select()
+          .from(digitalFiles)
+          .where(
+            inArray(
+              digitalFiles.productId,
+              productList.map((p) => p.id),
+            ),
+          );
+
+  const filesByProduct = new Map<string, typeof files>();
+  for (const file of files) {
+    const list = filesByProduct.get(file.productId) ?? [];
+    list.push(file);
+    filesByProduct.set(file.productId, list);
+  }
 
   return (
     <div className="space-y-6">
@@ -101,6 +122,17 @@ export default async function ProductsPage() {
                     {product.inventorySold} sold
                   </span>
                 </div>
+                <ProductFileAttach
+                  productId={product.id}
+                  canSell={canSell}
+                  initialFiles={(filesByProduct.get(product.id) ?? []).map(
+                    (f) => ({
+                      id: f.id,
+                      filename: f.filename,
+                      sizeBytes: f.sizeBytes,
+                    }),
+                  )}
+                />
               </CardContent>
             </Card>
           ))}

@@ -1,17 +1,35 @@
 import { notFound } from "next/navigation";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { profiles, blocks, socialLinks, themes } from "@/lib/db/schema";
+import {
+  profiles,
+  blocks,
+  socialLinks,
+  themes,
+  integrations,
+  experiments,
+  experimentVariants,
+} from "@/lib/db/schema";
 import { themeToCssVars, cssVarsToStyle } from "@/lib/themes/resolver";
 import { brandConfig } from "@/lib/brand";
 import { ProfileView } from "@/components/public/profile-view";
 import { AnalyticsBeacon } from "@/components/public/analytics-beacon";
+import {
+  TrackingPixels,
+  type TrackingPixel,
+} from "@/components/public/tracking-pixels";
 import type { Metadata } from "next";
 import type { ThemeConfig } from "@/lib/themes/types";
 
 type Props = {
   params: Promise<{ username: string }>;
 };
+
+const PIXEL_PROVIDERS = new Set([
+  "facebook_pixel",
+  "google_analytics",
+  "tiktok_pixel",
+]);
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { username } = await params;
@@ -72,26 +90,66 @@ export default async function UsernamePage({ params }: Props) {
 
   if (!profile) notFound();
 
-  const [profileBlocks, profileSocials, profileTheme] = await Promise.all([
-    db
+  const [profileBlocks, profileSocials, profileTheme, pixelRows, runningExp] =
+    await Promise.all([
+      db
+        .select()
+        .from(blocks)
+        .where(and(eq(blocks.profileId, profile.id), eq(blocks.enabled, true)))
+        .orderBy(asc(blocks.position)),
+      db
+        .select()
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.profileId, profile.id),
+            eq(socialLinks.enabled, true),
+          ),
+        )
+        .orderBy(asc(socialLinks.position)),
+      profile.themeId
+        ? db
+            .select()
+            .from(themes)
+            .where(eq(themes.id, profile.themeId))
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+      db
+        .select()
+        .from(integrations)
+        .where(
+          and(
+            eq(integrations.profileId, profile.id),
+            eq(integrations.enabled, true),
+          ),
+        ),
+      db
+        .select()
+        .from(experiments)
+        .where(
+          and(
+            eq(experiments.profileId, profile.id),
+            eq(experiments.status, "running"),
+          ),
+        )
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+    ]);
+
+  if (runningExp) {
+    const variants = await db
       .select()
-      .from(blocks)
-      .where(and(eq(blocks.profileId, profile.id), eq(blocks.enabled, true)))
-      .orderBy(asc(blocks.position)),
-    db
-      .select()
-      .from(socialLinks)
-      .where(and(eq(socialLinks.profileId, profile.id), eq(socialLinks.enabled, true)))
-      .orderBy(asc(socialLinks.position)),
-    profile.themeId
-      ? db
-          .select()
-          .from(themes)
-          .where(eq(themes.id, profile.themeId))
-          .limit(1)
-          .then((rows) => rows[0] ?? null)
-      : Promise.resolve(null),
-  ]);
+      .from(experimentVariants)
+      .where(eq(experimentVariants.experimentId, runningExp.id));
+    if (variants.length > 0) {
+      const pick = variants[Math.floor(Math.random() * variants.length)];
+      await db
+        .update(experimentVariants)
+        .set({ impressions: sql`${experimentVariants.impressions} + 1` })
+        .where(eq(experimentVariants.id, pick.id));
+    }
+  }
 
   const now = new Date();
   const visibleBlocks = profileBlocks.filter((b) => {
@@ -108,6 +166,16 @@ export default async function UsernamePage({ params }: Props) {
 
   const bgColor = themeConfig.background?.color ?? "#ffffff";
   const bgGradient = themeConfig.background?.gradient;
+
+  const pixels: TrackingPixel[] = pixelRows
+    .filter((r) => PIXEL_PROVIDERS.has(r.provider))
+    .map((r) => ({
+      provider: r.provider as TrackingPixel["provider"],
+      pixelId: String(
+        (r.config as Record<string, unknown> | null)?.pixelId ?? "",
+      ),
+    }))
+    .filter((p) => p.pixelId.length > 0);
 
   return (
     <div
@@ -141,6 +209,7 @@ export default async function UsernamePage({ params }: Props) {
         themeConfig={themeConfig}
       />
       <AnalyticsBeacon profileId={profile.id} />
+      <TrackingPixels pixels={pixels} />
     </div>
   );
 }

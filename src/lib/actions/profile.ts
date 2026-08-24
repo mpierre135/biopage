@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { profiles, users } from "@/lib/db/schema";
 import { getCurrentDbUser } from "@/lib/auth/session";
-import { profileUpdateSchema, usernameSchema } from "@/lib/validation/profile";
+import { canUseFeature } from "@/lib/billing/entitlements";
+import { profileUpdateSchema } from "@/lib/validation/profile";
 import { normalizeUsername, validateUsername } from "@/lib/security/usernames";
 
 export type ActionResult = {
@@ -75,6 +76,18 @@ export async function updateProfile(
   if (!parsed.success) {
     const firstError = Object.values(parsed.error.flatten().fieldErrors)[0]?.[0];
     return { success: false, error: firstError ?? "Invalid data." };
+  }
+
+  if (
+    parsed.data.customDomain !== undefined &&
+    parsed.data.customDomain !== ""
+  ) {
+    if (!(await canUseFeature(user.id, "customDomain"))) {
+      return {
+        success: false,
+        error: "Upgrade to Creator to use a custom domain.",
+      };
+    }
   }
 
   if (parsed.data.username) {

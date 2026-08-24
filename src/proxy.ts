@@ -24,6 +24,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
   "/api/collect(.*)",
   "/api/v1/public(.*)",
+  "/api/uploads(.*)",
   "/download(.*)",
   "/x/(.*)",
   // Username bio pages: single path segment not matching any reserved prefix.

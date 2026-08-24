@@ -22,7 +22,10 @@ export default async function SettingsPage() {
 
   if (!profile) redirect("/onboarding");
 
-  const canRemoveBranding = await canUseFeature(user.id, "removeBranding");
+  const [canRemoveBranding, canCustomDomain] = await Promise.all([
+    canUseFeature(user.id, "removeBranding"),
+    canUseFeature(user.id, "customDomain"),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -36,12 +39,14 @@ export default async function SettingsPage() {
       <SettingsForm
         profileId={profile.id}
         canRemoveBranding={canRemoveBranding}
+        canCustomDomain={canCustomDomain}
         initial={{
           displayName: profile.displayName ?? "",
           bio: profile.bio ?? "",
           location: profile.location ?? "",
           seoTitle: profile.seoTitle ?? "",
           seoDescription: profile.seoDescription ?? "",
+          customDomain: profile.customDomain ?? "",
           isPublished: profile.isPublished,
           showBranding: profile.showBranding,
           visibility: profile.visibility as "public" | "unlisted" | "private",

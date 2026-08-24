@@ -15,7 +15,9 @@ import {
   CreditCard,
   Settings,
   Menu,
-  X,
+  Crosshair,
+  FlaskConical,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +35,9 @@ const navItems = [
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/audience", label: "Audience", icon: Users },
   { href: "/dashboard/products", label: "Products", icon: ShoppingBag },
+  { href: "/dashboard/pixels", label: "Pixels", icon: Crosshair },
+  { href: "/dashboard/experiments", label: "Experiments", icon: FlaskConical },
+  { href: "/dashboard/team", label: "Team", icon: UserCog },
   { href: "/dashboard/qr", label: "QR Code", icon: QrCode },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
