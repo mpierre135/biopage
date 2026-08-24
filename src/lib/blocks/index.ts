@@ -1,19 +1,3 @@
-import { z } from "zod";
-import {
-  Video,
-  Music,
-  FileText,
-  GraduationCap,
-  CalendarDays,
-  Heart,
-  Images,
-  ChevronRight,
-  Star,
-} from "lucide-react";
-import { ComponentType } from "react";
-import { BlockEditorProps, BlockRenderProps, BlockType } from "./types";
-import { registerBlock } from "./registry";
-
 import { linkDescriptor } from "@/components/blocks/link";
 import { headerDescriptor } from "@/components/blocks/header";
 import { textDescriptor } from "@/components/blocks/text";
@@ -32,6 +16,17 @@ import { contactDescriptor } from "@/components/blocks/contact";
 import { faqDescriptor } from "@/components/blocks/faq";
 import { countdownDescriptor } from "@/components/blocks/countdown";
 import { mapDescriptor } from "@/components/blocks/map";
+import { videoDescriptor } from "@/components/blocks/video";
+import { appleMusicDescriptor } from "@/components/blocks/apple-music";
+import { soundcloudDescriptor } from "@/components/blocks/soundcloud";
+import { formDescriptor } from "@/components/blocks/form";
+import { courseDescriptor } from "@/components/blocks/course";
+import { bookingDescriptor } from "@/components/blocks/booking";
+import { donationDescriptor } from "@/components/blocks/donation";
+import { galleryDescriptor } from "@/components/blocks/gallery";
+import { carouselDescriptor } from "@/components/blocks/carousel";
+import { testimonialDescriptor } from "@/components/blocks/testimonial";
+import { registerBlock } from "./registry";
 
 registerBlock(linkDescriptor);
 registerBlock(headerDescriptor);
@@ -40,66 +35,27 @@ registerBlock(imageDescriptor);
 registerBlock(youtubeDescriptor);
 registerBlock(vimeoDescriptor);
 registerBlock(spotifyDescriptor);
+registerBlock(videoDescriptor);
+registerBlock(appleMusicDescriptor);
+registerBlock(soundcloudDescriptor);
 registerBlock(emailCaptureDescriptor);
 registerBlock(smsCaptureDescriptor);
+registerBlock(formDescriptor);
 registerBlock(dividerDescriptor);
 registerBlock(productDescriptor);
 registerBlock(digitalProductDescriptor);
+registerBlock(courseDescriptor);
+registerBlock(bookingDescriptor);
+registerBlock(donationDescriptor);
 registerBlock(customEmbedDescriptor);
 registerBlock(socialDescriptor);
 registerBlock(contactDescriptor);
 registerBlock(faqDescriptor);
 registerBlock(countdownDescriptor);
 registerBlock(mapDescriptor);
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-function StubRender(_props: BlockRenderProps<any>) {
-  return null;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-function StubEditor(_props: BlockEditorProps<any>) {
-  return null;
-}
-
-const stubSchema = z.record(z.string(), z.unknown());
-
-function stub(
-  type: BlockType,
-  label: string,
-  description: string,
-  icon: ComponentType,
-  category: "links" | "media" | "capture" | "commerce" | "layout",
-  requiredFeature?: string,
-) {
-  registerBlock({
-    type,
-    label,
-    description,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    icon: icon as any,
-    category,
-    schema: stubSchema,
-    defaultConfig: {},
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Render: StubRender as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Editor: StubEditor as any,
-    requiredFeature,
-    ready: false,
-  });
-}
-
-stub("VIDEO", "Video", "Embed a hosted video file", Video, "media");
-stub("APPLE_MUSIC", "Apple Music", "Embed an Apple Music song or album", Music, "media");
-stub("SOUNDCLOUD", "SoundCloud", "Embed a SoundCloud track", Music, "media");
-stub("FORM", "Form", "A custom multi-field form", FileText, "capture", "forms");
-stub("COURSE", "Course", "Sell and showcase a course", GraduationCap, "commerce", "courses");
-stub("BOOKING", "Booking", "Let visitors book time with you", CalendarDays, "commerce", "booking");
-stub("DONATION", "Donation", "Accept tips or donations", Heart, "commerce", "donations");
-stub("GALLERY", "Gallery", "A photo gallery grid", Images, "media", "gallery");
-stub("CAROUSEL", "Carousel", "A swipeable image carousel", ChevronRight, "media", "gallery");
-stub("TESTIMONIAL", "Testimonial", "A quote or social proof block", Star, "layout");
+registerBlock(galleryDescriptor);
+registerBlock(carouselDescriptor);
+registerBlock(testimonialDescriptor);
 
 export { getBlock, listBlocks, listBlocksByCategory, registerBlock, registry } from "./registry";
 export type {
