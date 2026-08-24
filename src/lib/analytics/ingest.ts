@@ -5,6 +5,7 @@ import { analyticsDaily, analyticsEvents } from "@/lib/db/schema";
 import {
   LEAD_CAPTURE,
   LINK_CLICK,
+  PRODUCT_CLICK,
   PROFILE_VIEW,
   PURCHASE,
   type AnalyticsEventInput,
@@ -62,7 +63,8 @@ export async function ingestEvent(input: AnalyticsEventInput): Promise<void> {
 
   // Determine which daily counters to increment
   const isView = input.eventType === PROFILE_VIEW;
-  const isClick = input.eventType === LINK_CLICK;
+  const isClick =
+    input.eventType === LINK_CLICK || input.eventType === PRODUCT_CLICK;
   const isLead = input.eventType === LEAD_CAPTURE;
   const isPurchase = input.eventType === PURCHASE;
 

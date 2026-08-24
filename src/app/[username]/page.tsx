@@ -93,6 +93,13 @@ export default async function UsernamePage({ params }: Props) {
       : Promise.resolve(null),
   ]);
 
+  const now = new Date();
+  const visibleBlocks = profileBlocks.filter((b) => {
+    if (b.publishAt && b.publishAt > now) return false;
+    if (b.expireAt && b.expireAt <= now) return false;
+    return true;
+  });
+
   const themeConfig = (profileTheme?.config as ThemeConfig) ??
     (profile.designConfig as ThemeConfig) ??
     {};
@@ -121,7 +128,7 @@ export default async function UsernamePage({ params }: Props) {
           profileImage: profile.profileImage,
           showBranding: profile.showBranding,
         }}
-        blocks={profileBlocks.map((b) => ({
+        blocks={visibleBlocks.map((b) => ({
           id: b.id,
           type: b.type,
           config: b.config as Record<string, unknown>,

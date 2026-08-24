@@ -14,6 +14,19 @@ export function DigitalProductEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
+        <Label htmlFor="dp-id">Product ID</Label>
+        <Input
+          id="dp-id"
+          value={config.productId ?? ""}
+          onChange={(e) =>
+            onChange({ ...config, productId: e.target.value || undefined })
+          }
+          placeholder="Paste ID from Dashboard → Products"
+          className="min-h-11 font-mono text-xs"
+        />
+      </div>
+
+      <div className="space-y-1.5">
         <Label htmlFor="dp-title">Product name</Label>
         <Input
           id="dp-title"

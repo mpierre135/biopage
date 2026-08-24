@@ -132,3 +132,29 @@ export async function createCheckoutSession(
 
   return { success: true as const, url: session.url };
 }
+
+export async function createBillingPortalSession() {
+  const stripe = getStripe();
+  if (!stripe) {
+    return {
+      success: false as const,
+      error: "Payments are not configured yet.",
+    };
+  }
+
+  const user = await getCurrentDbUser();
+  if (!user.stripeCustomerId) {
+    return {
+      success: false as const,
+      error: "No billing account found. Subscribe to a plan first.",
+    };
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const portal = await stripe.billingPortal.sessions.create({
+    customer: user.stripeCustomerId,
+    return_url: `${appUrl}/dashboard/billing`,
+  });
+
+  return { success: true as const, url: portal.url as string };
+}

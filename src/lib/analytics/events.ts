@@ -4,6 +4,7 @@
 
 export const PROFILE_VIEW = "profile_view" as const;
 export const LINK_CLICK = "link_click" as const;
+export const PRODUCT_CLICK = "product_click" as const;
 export const LEAD_CAPTURE = "lead_capture" as const;
 export const PURCHASE = "purchase" as const;
 export const BLOCK_VIEW = "block_view" as const;
@@ -16,6 +17,7 @@ export const QR_SCAN = "qr_scan" as const;
 export const ANALYTICS_EVENT_TYPES = [
   PROFILE_VIEW,
   LINK_CLICK,
+  PRODUCT_CLICK,
   LEAD_CAPTURE,
   PURCHASE,
   BLOCK_VIEW,
@@ -29,6 +31,7 @@ export const ANALYTICS_EVENT_TYPES = [
 export type AnalyticsEventType =
   | typeof PROFILE_VIEW
   | typeof LINK_CLICK
+  | typeof PRODUCT_CLICK
   | typeof LEAD_CAPTURE
   | typeof PURCHASE
   | typeof BLOCK_VIEW

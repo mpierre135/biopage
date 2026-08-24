@@ -22,19 +22,30 @@ import {
   Plus,
   GripVertical,
   Trash2,
-  Eye,
-  EyeOff,
   Loader2,
   Smartphone,
   Link as LinkIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
+import { BlockEditor } from "@/components/blocks/block-editor";
 import { getBlock, listBlocks } from "@/lib/blocks";
-import { createBlock, updateBlock, deleteBlock, reorderBlocks } from "@/lib/actions/blocks";
+import {
+  createBlock,
+  updateBlock,
+  deleteBlock,
+  reorderBlocks,
+} from "@/lib/actions/blocks";
 import { cn } from "@/lib/utils";
 import type { BlockType } from "@/lib/blocks";
 
@@ -103,6 +114,7 @@ function SortableBlock({
           {(block.config as Record<string, string>).title ??
             (block.config as Record<string, string>).url ??
             (block.config as Record<string, string>).text ??
+            (block.config as Record<string, string>).headline ??
             "Click to edit"}
         </p>
       </button>
@@ -138,11 +150,15 @@ export function LinksEditor({
   const [items, setItems] = useState(initialBlocks);
   const [isPending, startTransition] = useTransition();
   const [addOpen, setAddOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftConfig, setDraftConfig] = useState<Record<string, unknown>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  const editing = items.find((i) => i.id === editingId) ?? null;
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -155,7 +171,10 @@ export function LinksEditor({
     setItems(newItems);
 
     startTransition(async () => {
-      await reorderBlocks(profileId, newItems.map((i) => i.id));
+      await reorderBlocks(
+        profileId,
+        newItems.map((i) => i.id),
+      );
     });
   }
 
@@ -174,6 +193,7 @@ export function LinksEditor({
 
   function handleDelete(blockId: string) {
     setItems((prev) => prev.filter((i) => i.id !== blockId));
+    if (editingId === blockId) setEditingId(null);
     startTransition(async () => {
       await deleteBlock(blockId);
     });
@@ -191,21 +211,44 @@ export function LinksEditor({
         config: descriptor.defaultConfig as Record<string, unknown>,
       });
       if (result.success && result.blockId) {
-        setItems((prev) => [
-          ...prev,
-          {
-            id: result.blockId!,
-            type,
-            position: prev.length,
-            enabled: true,
-            config: descriptor.defaultConfig as Record<string, unknown>,
-          },
-        ]);
+        const newBlock = {
+          id: result.blockId,
+          type,
+          position: items.length,
+          enabled: true,
+          config: descriptor.defaultConfig as Record<string, unknown>,
+        };
+        setItems((prev) => [...prev, newBlock]);
+        setEditingId(result.blockId);
+        setDraftConfig(newBlock.config);
+      } else if (result.error) {
+        toast.error(result.error);
       }
     });
   }
 
-  const availableBlocks = listBlocks();
+  function openEdit(block: BlockItem) {
+    setEditingId(block.id);
+    setDraftConfig(block.config);
+  }
+
+  function saveEdit() {
+    if (!editing) return;
+    setItems((prev) =>
+      prev.map((i) => (i.id === editing.id ? { ...i, config: draftConfig } : i)),
+    );
+    startTransition(async () => {
+      const result = await updateBlock(editing.id, { config: draftConfig });
+      if (result.success) {
+        toast.success("Block saved");
+        setEditingId(null);
+      } else {
+        toast.error(result.error ?? "Failed to save");
+      }
+    });
+  }
+
+  const availableBlocks = listBlocks({ readyOnly: true });
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -275,7 +318,7 @@ export function LinksEditor({
                   block={block}
                   onToggle={() => handleToggle(block.id)}
                   onDelete={() => handleDelete(block.id)}
-                  onEdit={() => {}}
+                  onEdit={() => openEdit(block)}
                 />
               ))}
             </div>
@@ -290,12 +333,13 @@ export function LinksEditor({
         )}
       </div>
 
-      {/* Phone preview */}
       <div className="hidden lg:block">
         <div className="sticky top-24">
           <div className="flex items-center gap-2 pb-3">
             <Smartphone className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">Preview</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              Preview
+            </span>
           </div>
           <div className="mx-auto w-[280px] rounded-[2rem] border-4 border-slate-800 bg-white p-4 shadow-xl">
             <div className="space-y-2">
@@ -319,6 +363,50 @@ export function LinksEditor({
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={!!editing}
+        onOpenChange={(open) => {
+          if (!open) setEditingId(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Edit {editing ? getBlock(editing.type)?.label ?? "block" : "block"}
+            </DialogTitle>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-4 pt-2">
+              <BlockEditor
+                type={editing.type}
+                config={draftConfig}
+                onChange={setDraftConfig}
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  className="min-h-11 cursor-pointer"
+                  onClick={() => setEditingId(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="min-h-11 cursor-pointer"
+                  onClick={saveEdit}
+                  disabled={isPending}
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

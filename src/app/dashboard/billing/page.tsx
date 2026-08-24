@@ -1,22 +1,26 @@
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { CreditCard, ArrowUpRight, CheckCircle, Zap } from "lucide-react";
+import { CreditCard, CheckCircle, Zap } from "lucide-react";
 import { db } from "@/lib/db";
-import { profiles, subscriptions, plans } from "@/lib/db/schema";
+import { profiles, subscriptions } from "@/lib/db/schema";
 import { getCurrentDbUser } from "@/lib/auth/session";
 import { getUserPlan } from "@/lib/billing/entitlements";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BillingActions } from "./billing-actions";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Billing",
 };
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ success?: string; canceled?: string }>;
+}) {
   const user = await getCurrentDbUser();
+  const params = await searchParams;
 
   const [profile] = await db
     .select()
@@ -42,6 +46,17 @@ export default async function BillingPage() {
           Manage your subscription and billing details.
         </p>
       </div>
+
+      {params.success && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Subscription updated successfully.
+        </div>
+      )}
+      {params.canceled && (
+        <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Checkout was canceled. No changes were made.
+        </div>
+      )}
 
       <Card>
         <CardHeader>
@@ -89,20 +104,21 @@ export default async function BillingPage() {
                   "Custom domains",
                   "Digital products & commerce",
                 ].map((f) => (
-                  <li key={f} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <li
+                    key={f}
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
                     <CheckCircle className="h-3.5 w-3.5 text-indigo-600" />
                     {f}
                   </li>
                 ))}
               </ul>
-              <Button
-                render={<Link href="/pricing" />}
-                className="mt-4 cursor-pointer min-h-11 gap-2"
-              >
-                View Plans
-                <ArrowUpRight className="h-4 w-4" />
-              </Button>
+              <BillingActions planSlug={plan.slug} hasSubscription={false} />
             </div>
+          )}
+
+          {plan.slug !== "free" && (
+            <BillingActions planSlug={plan.slug} hasSubscription={!!sub} />
           )}
         </CardContent>
       </Card>

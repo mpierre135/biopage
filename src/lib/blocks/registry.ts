@@ -10,8 +10,12 @@ export function getBlock(type: BlockType): AnyBlockDescriptor | undefined {
   return registry.get(type);
 }
 
-export function listBlocks(): AnyBlockDescriptor[] {
-  return Array.from(registry.values());
+export function listBlocks(opts?: { readyOnly?: boolean }): AnyBlockDescriptor[] {
+  const all = Array.from(registry.values());
+  if (opts?.readyOnly) {
+    return all.filter((d) => d.ready !== false);
+  }
+  return all;
 }
 
 export function listBlocksByCategory(

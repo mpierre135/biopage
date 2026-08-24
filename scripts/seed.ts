@@ -86,7 +86,7 @@ async function seedPlanFeatures() {
   const featMap = new Map(allFeatures.map((f) => [f.key, f.id]));
 
   const matrix: Record<string, string[]> = {
-    free: ["leadCapture"],
+    free: [],
     creator: ["removeBranding", "advancedAnalytics", "customThemes", "scheduledLinks", "leadCapture", "customDomain", "qrCustomization"],
     pro: ["removeBranding", "advancedAnalytics", "customThemes", "scheduledLinks", "leadCapture", "customDomain", "digitalProducts", "integrations", "pixels", "multipleProfiles", "csvExport", "qrCustomization"],
     business: ["removeBranding", "advancedAnalytics", "customThemes", "scheduledLinks", "leadCapture", "customDomain", "digitalProducts", "integrations", "pixels", "advancedRouting", "abTesting", "multipleProfiles", "teams", "csvExport", "qrCustomization"],

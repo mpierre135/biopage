@@ -26,4 +26,5 @@ export const smsCaptureDescriptor: BlockDescriptor<SmsCaptureConfig> = {
   },
   Render: SmsCaptureRender,
   Editor: SmsCaptureEditor,
+  requiredFeature: "leadCapture",
 };

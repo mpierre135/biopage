@@ -41,7 +41,7 @@ export function LinkRender({ config, blockId }: BlockRenderProps<LinkConfig>) {
 
   const sharedDataAttrs = {
     "data-block-id": blockId,
-    "data-event": "LINK_CLICK",
+    "data-event": "link_click",
   } as const;
 
   const sharedLinkProps = {

@@ -61,6 +61,8 @@ export const profileUpdateSchema = z.object({
   isPublished: z.boolean().optional(),
   showBranding: z.boolean().optional(),
   socialIconPosition: z.enum(["top", "bottom"]).optional(),
+  themeId: z.string().uuid().nullable().optional(),
+  designConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;

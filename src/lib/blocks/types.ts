@@ -54,6 +54,8 @@ export interface BlockDescriptor<C = Record<string, unknown>> {
   Editor: ComponentType<BlockEditorProps<C>>;
   Render: ComponentType<BlockRenderProps<C>>;
   requiredFeature?: string;
+  /** When false, block is hidden from the add picker (not yet implemented). */
+  ready?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

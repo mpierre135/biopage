@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
-import { subscriptions, plans, users } from "@/lib/db/schema";
+import {
+  subscriptions,
+  plans,
+  users,
+  products,
+  orders,
+  orderItems,
+  digitalFiles,
+  downloadTokens,
+} from "@/lib/db/schema";
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -51,6 +61,8 @@ export async function POST(req: NextRequest) {
           session.subscription as string,
         );
         await syncSubscription(sub);
+      } else if (session.mode === "payment") {
+        await fulfillProductPurchase(session);
       }
       break;
     }
@@ -155,3 +167,68 @@ async function syncSubscription(sub: any) {
     });
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fulfillProductPurchase(session: any) {
+  const productId = session.metadata?.productId as string | undefined;
+  const profileId = session.metadata?.profileId as string | undefined;
+  if (!productId || !profileId) return;
+
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(eq(products.id, productId))
+    .limit(1);
+  if (!product) return;
+
+  const email =
+    session.customer_details?.email ??
+    session.customer_email ??
+    "buyer@unknown";
+
+  const [order] = await db
+    .insert(orders)
+    .values({
+      profileId,
+      email,
+      status: "paid",
+      total: product.salePrice ?? product.price,
+      currency: product.currency,
+      stripeSessionId: session.id,
+      stripePaymentIntentId:
+        typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : null,
+    })
+    .returning({ id: orders.id });
+
+  await db.insert(orderItems).values({
+    orderId: order.id,
+    productId: product.id,
+    title: product.title,
+    quantity: 1,
+    unitPrice: product.salePrice ?? product.price,
+  });
+
+  await db
+    .update(products)
+    .set({ inventorySold: sql`${products.inventorySold} + 1` })
+    .where(eq(products.id, product.id));
+
+  const files = await db
+    .select({ id: digitalFiles.id })
+    .from(digitalFiles)
+    .where(eq(digitalFiles.productId, product.id));
+
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  for (const file of files) {
+    await db.insert(downloadTokens).values({
+      orderId: order.id,
+      fileId: file.id,
+      token: randomBytes(24).toString("hex"),
+      expiresAt,
+      maxDownloads: 5,
+    });
+  }
+}
+

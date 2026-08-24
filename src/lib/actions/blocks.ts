@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { blocks, profiles } from "@/lib/db/schema";
@@ -11,6 +11,10 @@ import {
   type BlockCreateInput,
   type BlockUpdateInput,
 } from "@/lib/validation/profile";
+import { getBlock } from "@/lib/blocks/registry";
+import "@/lib/blocks";
+import { canUseFeature, getUserPlan } from "@/lib/billing/entitlements";
+import { getPlanLimits, type FeatureKey, FEATURE_KEYS } from "@/lib/billing/features";
 
 type ActionResult = {
   success: boolean;
@@ -28,6 +32,10 @@ async function verifyProfileOwnership(profileId: string, userId: string) {
   return profile?.userId === userId;
 }
 
+function isFeatureKey(value: string): value is FeatureKey {
+  return (FEATURE_KEYS as readonly string[]).includes(value);
+}
+
 export async function createBlock(
   profileId: string,
   data: BlockCreateInput,
@@ -40,6 +48,46 @@ export async function createBlock(
   const parsed = blockCreateSchema.safeParse(data);
   if (!parsed.success) {
     return { success: false, error: "Invalid block data." };
+  }
+
+  const descriptor = getBlock(parsed.data.type);
+  if (!descriptor || descriptor.ready === false) {
+    return { success: false, error: "This block type is not available yet." };
+  }
+
+  if (descriptor.requiredFeature && isFeatureKey(descriptor.requiredFeature)) {
+    const allowed = await canUseFeature(user.id, descriptor.requiredFeature);
+    if (!allowed) {
+      return {
+        success: false,
+        error: "Upgrade your plan to use this block.",
+      };
+    }
+  }
+
+  // Capture blocks require leadCapture
+  if (
+    (parsed.data.type === "EMAIL_CAPTURE" ||
+      parsed.data.type === "SMS_CAPTURE") &&
+    !(await canUseFeature(user.id, "leadCapture"))
+  ) {
+    return {
+      success: false,
+      error: "Upgrade to Creator or higher to capture leads.",
+    };
+  }
+
+  const plan = await getUserPlan(user.id);
+  const limits = getPlanLimits(plan.slug);
+  const [countRow] = await db
+    .select({ total: sql<number>`COUNT(*)` })
+    .from(blocks)
+    .where(eq(blocks.profileId, profileId));
+  if (Number(countRow?.total ?? 0) >= limits.blocks) {
+    return {
+      success: false,
+      error: `Free plan allows up to ${limits.blocks} blocks. Upgrade to add more.`,
+    };
   }
 
   const [maxPos] = await db
@@ -87,6 +135,17 @@ export async function updateBlock(
   const parsed = blockUpdateSchema.safeParse(data);
   if (!parsed.success) {
     return { success: false, error: "Invalid block data." };
+  }
+
+  if (
+    (parsed.data.publishAt !== undefined ||
+      parsed.data.expireAt !== undefined) &&
+    !(await canUseFeature(user.id, "scheduledLinks"))
+  ) {
+    return {
+      success: false,
+      error: "Upgrade to schedule links.",
+    };
   }
 
   const updateData: Record<string, unknown> = {};

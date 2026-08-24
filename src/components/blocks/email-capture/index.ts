@@ -28,4 +28,5 @@ export const emailCaptureDescriptor: BlockDescriptor<EmailCaptureConfig> = {
   },
   Render: EmailCaptureRender,
   Editor: EmailCaptureEditor,
+  requiredFeature: "leadCapture",
 };

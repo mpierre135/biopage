@@ -96,6 +96,16 @@ export async function updateProfile(
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings");
+  revalidatePath("/dashboard/design");
+
+  const [updated] = await db
+    .select({ username: profiles.username })
+    .from(profiles)
+    .where(eq(profiles.id, profileId))
+    .limit(1);
+  if (updated?.username) {
+    revalidatePath(`/${updated.username}`);
+  }
 
   return { success: true };
 }

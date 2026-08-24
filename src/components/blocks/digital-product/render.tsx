@@ -80,7 +80,7 @@ export function DigitalProductRender({
           href={checkoutUrl}
           className="flex items-center justify-center gap-2 w-full rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition-colors"
           data-block-id={blockId}
-          data-event="PRODUCT_CLICK"
+          data-event="product_click"
         >
           <Download className="size-4" />
           {buttonText}

@@ -11,6 +11,22 @@ export function ProductEditor({ config, onChange }: BlockEditorProps<ProductConf
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
+        <Label htmlFor="prod-id">Product ID</Label>
+        <Input
+          id="prod-id"
+          value={config.productId ?? ""}
+          onChange={(e) =>
+            onChange({ ...config, productId: e.target.value || undefined })
+          }
+          placeholder="Paste ID from Dashboard → Products"
+          className="min-h-11 font-mono text-xs"
+        />
+        <p className="text-xs text-muted-foreground">
+          Create a product first, then paste its ID here to enable checkout.
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
         <Label htmlFor="prod-title">Product name</Label>
         <Input
           id="prod-title"

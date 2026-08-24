@@ -42,6 +42,19 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
 };
 
 /** Features available on the free plan (no subscription required). */
-export const FREE_FEATURES = new Set<FeatureKey>([
-  "leadCapture",
-]);
+export const FREE_FEATURES = new Set<FeatureKey>([]);
+
+/** Soft usage caps by plan slug (enforced in create actions). */
+export const PLAN_LIMITS: Record<
+  string,
+  { profiles: number; blocks: number }
+> = {
+  free: { profiles: 1, blocks: 5 },
+  creator: { profiles: 3, blocks: Number.POSITIVE_INFINITY },
+  pro: { profiles: 10, blocks: Number.POSITIVE_INFINITY },
+  business: { profiles: Number.POSITIVE_INFINITY, blocks: Number.POSITIVE_INFINITY },
+};
+
+export function getPlanLimits(slug: string) {
+  return PLAN_LIMITS[slug] ?? PLAN_LIMITS.free;
+}
