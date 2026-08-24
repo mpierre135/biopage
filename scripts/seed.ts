@@ -16,9 +16,9 @@ async function seedPlans() {
 
   const planData = [
     { name: "Free", slug: "free", description: "Perfect for getting started", monthlyPrice: "0", annualPrice: "0", sortOrder: 0 },
-    { name: "Creator", slug: "creator", description: "For serious content creators", monthlyPrice: "9", annualPrice: "84", sortOrder: 1 },
-    { name: "Pro", slug: "pro", description: "Unlock your full potential", monthlyPrice: "19", annualPrice: "180", sortOrder: 2 },
-    { name: "Business", slug: "business", description: "For teams and enterprises", monthlyPrice: "49", annualPrice: "468", sortOrder: 3 },
+    { name: "Creator", slug: "creator", description: "For serious content creators", monthlyPrice: "9", annualPrice: "84", sortOrder: 1, stripeMonthlyPriceId: "price_1U82inGXGD1VxBNCeLGa9QHl", stripeAnnualPriceId: "price_1U82ioGXGD1VxBNCP2rIiJJe" },
+    { name: "Pro", slug: "pro", description: "Unlock your full potential", monthlyPrice: "19", annualPrice: "180", sortOrder: 2, stripeMonthlyPriceId: "price_1U82ipGXGD1VxBNC4GCZOgoJ", stripeAnnualPriceId: "price_1U82ipGXGD1VxBNCUyeo2ckM" },
+    { name: "Business", slug: "business", description: "For teams and enterprises", monthlyPrice: "49", annualPrice: "468", sortOrder: 3, stripeMonthlyPriceId: "price_1U82irGXGD1VxBNCeNhtejTS", stripeAnnualPriceId: "price_1U82irGXGD1VxBNC7F42Lpvk" },
   ];
 
   for (const plan of planData) {
@@ -33,6 +33,8 @@ async function seedPlans() {
           monthlyPrice: plan.monthlyPrice,
           annualPrice: plan.annualPrice,
           sortOrder: plan.sortOrder,
+          ...("stripeMonthlyPriceId" in plan ? { stripeMonthlyPriceId: plan.stripeMonthlyPriceId } : {}),
+          ...("stripeAnnualPriceId" in plan ? { stripeAnnualPriceId: plan.stripeAnnualPriceId } : {}),
         },
       });
   }
