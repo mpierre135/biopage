@@ -1,8 +1,9 @@
-import { eq, and, gte, lte, desc } from "drizzle-orm";
-import { Eye, MousePointer, TrendingUp, Users } from "lucide-react";
-import { getCurrentDbUser } from "@/lib/auth/session";
+import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { BarChart3, Eye, MousePointer, TrendingUp, Users, Globe, Monitor } from "lucide-react";
 import { db } from "@/lib/db";
-import { profiles, analyticsDaily } from "@/lib/db/schema";
+import { profiles } from "@/lib/db/schema";
+import { getCurrentDbUser } from "@/lib/auth/session";
 import {
   getAnalyticsOverview,
   getTopLinks,
@@ -10,19 +11,13 @@ import {
   getDeviceBreakdown,
 } from "@/lib/analytics/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Metadata } from "next";
 
-function getRangeFromDays(days: number) {
-  const now = new Date();
-  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-  return { from, to: now };
-}
+export const metadata: Metadata = {
+  title: "Analytics",
+};
 
-export default async function AnalyticsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ range?: string }>;
-}) {
-  const params = await searchParams;
+export default async function AnalyticsPage() {
   const user = await getCurrentDbUser();
 
   const [profile] = await db
@@ -31,90 +26,45 @@ export default async function AnalyticsPage({
     .where(eq(profiles.userId, user.id))
     .limit(1);
 
-  const days = params.range === "90" ? 90 : params.range === "7" ? 7 : 30;
-  const range = getRangeFromDays(days);
+  if (!profile) redirect("/onboarding");
 
-  const overview = profile
-    ? await getAnalyticsOverview(profile.id, range)
-    : null;
-  const topLinks = profile ? await getTopLinks(profile.id, range) : [];
-  const trafficSources = profile
-    ? await getTrafficSources(profile.id, range)
-    : [];
-  const deviceBreakdown = profile
-    ? await getDeviceBreakdown(profile.id, range)
-    : [];
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const range = { from: thirtyDaysAgo, to: now };
 
-  const dailyData = profile
-    ? await db
-        .select()
-        .from(analyticsDaily)
-        .where(
-          and(
-            eq(analyticsDaily.profileId, profile.id),
-            gte(analyticsDaily.date, range.from),
-            lte(analyticsDaily.date, range.to)
-          )
-        )
-        .orderBy(analyticsDaily.date)
-    : [];
+  const [overview, topLinks, trafficSources, deviceBreakdown] = await Promise.all([
+    getAnalyticsOverview(profile.id, range),
+    getTopLinks(profile.id, range),
+    getTrafficSources(profile.id, range),
+    getDeviceBreakdown(profile.id, range),
+  ]);
 
   const stats = [
-    { label: "Views", value: overview?.totalViews ?? 0, icon: Eye },
-    { label: "Clicks", value: overview?.totalClicks ?? 0, icon: MousePointer },
-    {
-      label: "CTR",
-      value: `${((overview?.clickThroughRate ?? 0) * 100).toFixed(1)}%`,
-      icon: TrendingUp,
-    },
-    { label: "Leads", value: overview?.totalLeads ?? 0, icon: Users },
+    { label: "Views", value: overview.totalViews, icon: Eye },
+    { label: "Clicks", value: overview.totalClicks, icon: MousePointer },
+    { label: "CTR", value: `${(overview.clickThroughRate * 100).toFixed(1)}%`, icon: TrendingUp },
+    { label: "Leads", value: overview.totalLeads, icon: Users },
   ];
 
-  const maxViews = Math.max(...dailyData.map((d) => d.views), 1);
-
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Analytics</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Track your page performance.
-          </p>
-        </div>
-
-        {/* Date range selector */}
-        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1">
-          {[
-            { label: "7d", value: "7" },
-            { label: "30d", value: "30" },
-            { label: "90d", value: "90" },
-          ].map((option) => (
-            <a
-              key={option.value}
-              href={`/dashboard/analytics?range=${option.value}`}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-200 cursor-pointer min-h-[44px] flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                String(days) === option.value
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              {option.label}
-            </a>
-          ))}
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Last 30 days performance overview.
+        </p>
       </div>
 
-      {/* Stats cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-600">
+                  <p className="text-sm font-medium text-muted-foreground">
                     {stat.label}
                   </p>
-                  <p className="mt-1 text-2xl font-semibold text-slate-900">
+                  <p className="mt-1 text-2xl font-semibold text-foreground">
                     {typeof stat.value === "number"
                       ? stat.value.toLocaleString()
                       : stat.value}
@@ -129,64 +79,24 @@ export default async function AnalyticsPage({
         ))}
       </div>
 
-      {/* Bar chart (CSS/SVG) */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Views over time</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dailyData.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-500">
-              No data available for this period.
-            </p>
-          ) : (
-            <div className="flex h-48 items-end gap-1">
-              {dailyData.map((day) => {
-                const height = (day.views / maxViews) * 100;
-                return (
-                  <div
-                    key={day.id}
-                    className="group relative flex-1"
-                    title={`${day.views} views`}
-                  >
-                    <div
-                      className="w-full rounded-t bg-indigo-500 transition-all duration-200 hover:bg-indigo-600"
-                      style={{ height: `${Math.max(height, 2)}%` }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Top links */}
         <Card>
           <CardHeader>
-            <CardTitle>Top Links</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Globe className="h-4 w-4 text-muted-foreground" />
+              Traffic Sources
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {topLinks.length === 0 ? (
-              <p className="text-sm text-slate-500">No click data yet.</p>
+            {trafficSources.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No traffic data yet.</p>
             ) : (
               <div className="space-y-3">
-                {topLinks.map((link, idx) => (
-                  <div
-                    key={link.blockId}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-6 items-center justify-center rounded bg-slate-100 text-xs font-medium text-slate-600">
-                        {idx + 1}
-                      </span>
-                      <span className="truncate text-sm text-slate-700">
-                        {link.blockId.slice(0, 8)}...
-                      </span>
-                    </div>
-                    <span className="text-sm font-medium text-slate-900">
-                      {link.clicks.toLocaleString()} clicks
+                {trafficSources.map((source) => (
+                  <div key={source.source} className="flex items-center justify-between">
+                    <span className="text-sm text-foreground capitalize">{source.source}</span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {source.visits.toLocaleString()}
                     </span>
                   </div>
                 ))}
@@ -195,26 +105,23 @@ export default async function AnalyticsPage({
           </CardContent>
         </Card>
 
-        {/* Traffic sources */}
         <Card>
           <CardHeader>
-            <CardTitle>Traffic Sources</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Monitor className="h-4 w-4 text-muted-foreground" />
+              Devices
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {trafficSources.length === 0 ? (
-              <p className="text-sm text-slate-500">No source data yet.</p>
+            {deviceBreakdown.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No device data yet.</p>
             ) : (
               <div className="space-y-3">
-                {trafficSources.map((src) => (
-                  <div
-                    key={src.source}
-                    className="flex items-center justify-between"
-                  >
-                    <span className="text-sm text-slate-700 capitalize">
-                      {src.source}
-                    </span>
-                    <span className="text-sm font-medium text-slate-900">
-                      {src.visits.toLocaleString()}
+                {deviceBreakdown.map((d) => (
+                  <div key={d.device} className="flex items-center justify-between">
+                    <span className="text-sm text-foreground capitalize">{d.device}</span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {d.count.toLocaleString()}
                     </span>
                   </div>
                 ))}
@@ -224,33 +131,30 @@ export default async function AnalyticsPage({
         </Card>
       </div>
 
-      {/* Device breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Devices</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            Top Links
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {deviceBreakdown.length === 0 ? (
-            <p className="text-sm text-slate-500">No device data yet.</p>
+          {topLinks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No link clicks recorded yet.
+            </p>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-3">
-              {deviceBreakdown.map((device) => {
-                const total = deviceBreakdown.reduce(
-                  (sum, d) => sum + d.count,
-                  0
-                );
-                const pct = total > 0 ? (device.count / total) * 100 : 0;
-                return (
-                  <div key={device.device} className="text-center">
-                    <p className="text-2xl font-semibold text-slate-900">
-                      {pct.toFixed(0)}%
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600 capitalize">
-                      {device.device}
-                    </p>
-                  </div>
-                );
-              })}
+            <div className="space-y-3">
+              {topLinks.map((link, i) => (
+                <div key={link.blockId} className="flex items-center justify-between">
+                  <span className="text-sm text-foreground">
+                    #{i + 1} — {link.blockId.slice(0, 8)}...
+                  </span>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {link.clicks.toLocaleString()} clicks
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

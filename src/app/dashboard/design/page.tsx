@@ -1,10 +1,18 @@
 import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { Check, Palette } from "lucide-react";
-import { getCurrentDbUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { profiles, themes } from "@/lib/db/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { getCurrentDbUser } from "@/lib/auth/session";
+import { THEME_PRESETS } from "@/lib/themes/presets";
+import { themeToCssVars, cssVarsToStyle } from "@/lib/themes/resolver";
+import { Card, CardContent } from "@/components/ui/card";
+import type { Metadata } from "next";
+import type { ThemeConfig } from "@/lib/themes/types";
+
+export const metadata: Metadata = {
+  title: "Design",
+};
 
 export default async function DesignPage() {
   const user = await getCurrentDbUser();
@@ -15,207 +23,94 @@ export default async function DesignPage() {
     .where(eq(profiles.userId, user.id))
     .limit(1);
 
-  const allThemes = await db
-    .select()
-    .from(themes)
-    .where(eq(themes.isActive, true));
+  if (!profile) redirect("/onboarding");
 
-  const designConfig = (profile?.designConfig ?? {}) as Record<string, unknown>;
+  const currentThemeId = profile.themeId;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Design</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Customize the look and feel of your bio page.
+        <h1 className="text-2xl font-semibold text-foreground">Design</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Choose a theme for your public page.
         </p>
       </div>
 
-      {/* Theme picker */}
-      <section>
-        <h2 className="mb-4 text-lg font-medium text-slate-900">Themes</h2>
-        {allThemes.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Palette className="size-10 text-slate-300" />
-              <p className="mt-3 text-sm font-medium text-slate-900">
-                No themes available
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                Themes will appear here once configured.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {allThemes.map((theme) => {
-              const isActive = profile?.themeId === theme.id;
-              const config = theme.config as Record<string, unknown>;
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {THEME_PRESETS.map((preset) => {
+          const vars = themeToCssVars(preset.config);
+          const bgStyle = cssVarsToStyle(vars);
+          const bg = preset.config.background?.gradient ?? preset.config.background?.color ?? "#fff";
 
-              return (
-                <button
-                  key={theme.id}
-                  className={cn(
-                    "relative flex flex-col items-center rounded-xl border-2 p-4 transition-all duration-200 cursor-pointer",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2",
-                    "min-h-[44px]",
-                    isActive
-                      ? "border-indigo-500 bg-indigo-50"
-                      : "border-slate-200 hover:border-slate-300 bg-white"
-                  )}
+          return (
+            <Card
+              key={preset.slug}
+              className="group relative overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer"
+            >
+              <CardContent className="p-0">
+                <div
+                  className="flex h-32 flex-col items-center justify-center gap-2 p-4"
+                  style={{
+                    background: bg,
+                    color: preset.config.colors?.text ?? "#000",
+                  }}
                 >
-                  {/* Theme preview */}
                   <div
-                    className="mb-3 h-24 w-full rounded-lg"
+                    className="h-8 w-8 rounded-full"
                     style={{
-                      background:
-                        (config.background as string) ??
-                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                      backgroundColor: preset.config.colors?.primary ?? "#6366f1",
                     }}
                   />
-                  <span className="text-sm font-medium text-slate-900">
-                    {theme.name}
-                  </span>
-                  {theme.isPremium && (
-                    <span className="mt-1 text-xs text-indigo-600 font-medium">
-                      Premium
+                  <div
+                    className="h-2 w-16 rounded-full"
+                    style={{
+                      backgroundColor: preset.config.buttons?.backgroundColor ??
+                        preset.config.colors?.primary ?? "#6366f1",
+                      borderRadius: preset.config.buttons?.radius === "full" ? "9999px" : "6px",
+                    }}
+                  />
+                  <div
+                    className="h-2 w-12 rounded-full"
+                    style={{
+                      backgroundColor: preset.config.buttons?.backgroundColor ??
+                        preset.config.colors?.primary ?? "#6366f1",
+                      opacity: 0.6,
+                      borderRadius: preset.config.buttons?.radius === "full" ? "9999px" : "6px",
+                    }}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {preset.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {preset.category}
+                      {preset.isPremium && " · Premium"}
+                    </p>
+                  </div>
+                  {preset.isPremium && (
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                      Pro
                     </span>
                   )}
-                  {isActive && (
-                    <div className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-indigo-600">
-                      <Check className="size-3.5 text-white" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Color customization */}
-      <section>
-        <h2 className="mb-4 text-lg font-medium text-slate-900">Colors</h2>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="grid gap-6 sm:grid-cols-3">
-              <div>
-                <label
-                  htmlFor="color-primary"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Primary Color
-                </label>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="size-10 rounded-lg border border-slate-200"
-                    style={{
-                      backgroundColor:
-                        (designConfig.primaryColor as string) ?? "#6366f1",
-                    }}
-                  />
-                  <span className="text-sm text-slate-600 font-mono">
-                    {(designConfig.primaryColor as string) ?? "#6366f1"}
-                  </span>
                 </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="color-background"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Background
-                </label>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="size-10 rounded-lg border border-slate-200"
-                    style={{
-                      backgroundColor:
-                        (designConfig.backgroundColor as string) ?? "#ffffff",
-                    }}
-                  />
-                  <span className="text-sm text-slate-600 font-mono">
-                    {(designConfig.backgroundColor as string) ?? "#ffffff"}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <label
-                  htmlFor="color-text"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Text Color
-                </label>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="size-10 rounded-lg border border-slate-200"
-                    style={{
-                      backgroundColor:
-                        (designConfig.textColor as string) ?? "#1e293b",
-                    }}
-                  />
-                  <span className="text-sm text-slate-600 font-mono">
-                    {(designConfig.textColor as string) ?? "#1e293b"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
 
-      {/* Button style preview */}
-      <section>
-        <h2 className="mb-4 text-lg font-medium text-slate-900">
-          Button Preview
-        </h2>
+      {THEME_PRESETS.length === 0 && (
         <Card>
-          <CardContent className="pt-4">
-            <div className="flex flex-wrap gap-4">
-              <div
-                className="rounded-lg px-6 py-3 text-sm font-medium text-white transition-transform duration-200 hover:scale-105"
-                style={{
-                  backgroundColor:
-                    (designConfig.primaryColor as string) ?? "#6366f1",
-                }}
-              >
-                Filled Button
-              </div>
-              <div
-                className="rounded-lg border-2 px-6 py-3 text-sm font-medium transition-transform duration-200 hover:scale-105"
-                style={{
-                  borderColor:
-                    (designConfig.primaryColor as string) ?? "#6366f1",
-                  color: (designConfig.primaryColor as string) ?? "#6366f1",
-                }}
-              >
-                Outline Button
-              </div>
-              <div
-                className="rounded-full px-6 py-3 text-sm font-medium text-white transition-transform duration-200 hover:scale-105"
-                style={{
-                  backgroundColor:
-                    (designConfig.primaryColor as string) ?? "#6366f1",
-                }}
-              >
-                Rounded Button
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Font selection placeholder */}
-      <section>
-        <h2 className="mb-4 text-lg font-medium text-slate-900">Typography</h2>
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-center text-sm text-slate-500">
-              Font customization coming soon.
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Palette className="h-10 w-10 text-muted-foreground/40" />
+            <p className="mt-3 text-sm text-muted-foreground">
+              No themes available yet.
             </p>
           </CardContent>
         </Card>
-      </section>
+      )}
     </div>
   );
 }

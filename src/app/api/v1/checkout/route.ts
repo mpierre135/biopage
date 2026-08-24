@@ -12,69 +12,69 @@ function getStripe() {
   return new Stripe(key);
 }
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
+  const stripe = getStripe();
+  if (!stripe) {
+    return NextResponse.json(
+      { error: "Payments are not configured. Please set STRIPE_SECRET_KEY." },
+      { status: 503 },
+    );
+  }
+
+  const productId = req.nextUrl.searchParams.get("productId");
+  if (!productId) {
+    return NextResponse.json(
+      { error: "productId is required" },
+      { status: 400 },
+    );
+  }
+
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(eq(products.id, productId))
+    .limit(1);
+
+  if (!product || product.status !== "active") {
+    return NextResponse.json(
+      { error: "Product not found or not active" },
+      { status: 404 },
+    );
+  }
+
+  const [profile] = await db
+    .select({ username: profiles.username })
+    .from(profiles)
+    .where(eq(profiles.id, product.profileId))
+    .limit(1);
+
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const successUrl = profile
+    ? `${baseUrl}/${profile.username}?purchase=success`
+    : `${baseUrl}?purchase=success`;
+  const cancelUrl = profile
+    ? `${baseUrl}/${profile.username}`
+    : baseUrl;
+
+  const priceInCents = Math.round(Number(product.salePrice ?? product.price) * 100);
+
   try {
-    const body = await req.json();
-    const productId = body.productId as string | undefined;
-
-    if (!productId) {
-      return NextResponse.json(
-        { error: "productId is required" },
-        { status: 400 },
-      );
-    }
-
-    const [product] = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, productId))
-      .limit(1);
-
-    if (!product || product.status !== "active") {
-      return NextResponse.json(
-        { error: "Product not found or not available" },
-        { status: 404 },
-      );
-    }
-
-    const stripe = getStripe();
-    if (!stripe) {
-      return NextResponse.json(
-        { error: "Payments are not configured. Please contact the site owner." },
-        { status: 503 },
-      );
-    }
-
-    const [profile] = await db
-      .select({ username: profiles.username })
-      .from(profiles)
-      .where(eq(profiles.id, product.profileId))
-      .limit(1);
-
-    const successUrl = profile
-      ? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${profile.username}?checkout=success`
-      : `${process.env.NEXT_PUBLIC_APP_URL ?? ""}?checkout=success`;
-
-    const cancelUrl = profile
-      ? `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${profile.username}`
-      : `${process.env.NEXT_PUBLIC_APP_URL ?? ""}`;
-
-    const lineItem = product.stripePriceId
-      ? { price: product.stripePriceId, quantity: 1 }
-      : {
-          price_data: {
-            currency: product.currency,
-            product_data: { name: product.title },
-            unit_amount: Math.round(
-              parseFloat(product.salePrice ?? product.price) * 100,
-            ),
-          },
-          quantity: 1,
-        };
-
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [lineItem],
+      line_items: [
+        {
+          price_data: {
+            currency: product.currency,
+            product_data: {
+              name: product.title,
+              description: product.description ?? undefined,
+              images: product.thumbnail ? [product.thumbnail] : undefined,
+            },
+            unit_amount: priceInCents,
+          },
+          quantity: 1,
+        },
+      ],
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
@@ -83,12 +83,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.redirect(session.url!, 303);
   } catch (err) {
-    console.error("[checkout]", err);
-    return NextResponse.json(
-      { error: "Failed to create checkout session" },
-      { status: 500 },
-    );
+    const message = err instanceof Error ? err.message : "Checkout failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

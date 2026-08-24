@@ -13,6 +13,19 @@ export const DOWNLOAD = "download" as const;
 export const SHARE = "share" as const;
 export const QR_SCAN = "qr_scan" as const;
 
+export const ANALYTICS_EVENT_TYPES = [
+  PROFILE_VIEW,
+  LINK_CLICK,
+  LEAD_CAPTURE,
+  PURCHASE,
+  BLOCK_VIEW,
+  FORM_SUBMIT,
+  VIDEO_PLAY,
+  DOWNLOAD,
+  SHARE,
+  QR_SCAN,
+] as const;
+
 export type AnalyticsEventType =
   | typeof PROFILE_VIEW
   | typeof LINK_CLICK

@@ -1,377 +1,229 @@
 "use client";
 
-import { useState, useTransition, useCallback, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Loader2,
-  Sparkles,
-  User,
-  Briefcase,
-  Palette,
-  Music,
-  Star,
-  MoreHorizontal,
-  Users,
-  ShoppingBag,
-  Share2,
-  Handshake,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useCallback, useState, useTransition } from "react";
+import { ArrowRight, Check, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { completeOnboarding } from "./actions";
-import { checkUsernameAvailability } from "@/lib/actions/profile";
+import { createProfile } from "@/lib/actions/profile";
+import { brandConfig } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 
-type AccountType = "creator" | "business" | "artist" | "musician" | "influencer" | "other";
-type Objective = "grow_audience" | "sell_products" | "share_content" | "networking";
+const ACCOUNT_TYPES = [
+  "creator",
+  "influencer",
+  "photographer",
+  "musician",
+  "coach",
+  "freelancer",
+  "business",
+  "other",
+] as const;
 
-const ACCOUNT_TYPES: { value: AccountType; label: string; icon: typeof User }[] = [
-  { value: "creator", label: "Creator", icon: User },
-  { value: "business", label: "Business", icon: Briefcase },
-  { value: "artist", label: "Artist", icon: Palette },
-  { value: "musician", label: "Musician", icon: Music },
-  { value: "influencer", label: "Influencer", icon: Star },
-  { value: "other", label: "Other", icon: MoreHorizontal },
-];
-
-const OBJECTIVES: { value: Objective; label: string; description: string; icon: typeof Users }[] = [
-  {
-    value: "grow_audience",
-    label: "Grow my audience",
-    description: "Build an email list and get more followers",
-    icon: Users,
-  },
-  {
-    value: "sell_products",
-    label: "Sell products",
-    description: "Monetize with digital or physical products",
-    icon: ShoppingBag,
-  },
-  {
-    value: "share_content",
-    label: "Share content",
-    description: "Centralize my links, videos, and media",
-    icon: Share2,
-  },
-  {
-    value: "networking",
-    label: "Networking",
-    description: "Connect with others and share my info",
-    icon: Handshake,
-  },
-];
-
-interface WizardProps {
-  userId: string;
-}
-
-export function OnboardingWizard({ userId }: WizardProps) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+export function OnboardingWizard({ userId }: { userId: string }) {
+  void userId;
   const [step, setStep] = useState(0);
-
   const [username, setUsername] = useState("");
-  const [usernameStatus, setUsernameStatus] = useState<{
-    checking: boolean;
-    available?: boolean;
-    reason?: string;
-  }>({ checking: false });
-  const [accountType, setAccountType] = useState<AccountType | null>(null);
-  const [objective, setObjective] = useState<Objective | null>(null);
-  const [error, setError] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [accountType, setAccountType] = useState<string>("creator");
+  const [availability, setAvailability] = useState<{
+    available: boolean;
+    reason: string | null;
+  } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
-
-  const checkUsername = useCallback((value: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
+  const checkUsername = useCallback(async (value: string) => {
     if (value.length < 3) {
-      setUsernameStatus({ checking: false });
+      setAvailability(null);
       return;
     }
-
-    setUsernameStatus({ checking: true });
-
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const result = await checkUsernameAvailability(value);
-        setUsernameStatus({
-          checking: false,
-          available: result.available,
-          reason: result.reason,
-        });
-      } catch {
-        setUsernameStatus({ checking: false });
-      }
-    }, 400);
+    setChecking(true);
+    try {
+      const res = await fetch(
+        `/api/v1/public/username-check?u=${encodeURIComponent(value)}`,
+      );
+      const data = (await res.json()) as {
+        available: boolean;
+        reason: string | null;
+      };
+      setAvailability(data);
+    } catch {
+      setAvailability({ available: false, reason: "Could not check username" });
+    } finally {
+      setChecking(false);
+    }
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, []);
-
-  function handleUsernameChange(value: string) {
-    const sanitized = value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-    setUsername(sanitized);
-    checkUsername(sanitized);
+  function onUsernameChange(value: string) {
+    const cleaned = value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    setUsername(cleaned);
+    setAvailability(null);
+    void checkUsername(cleaned);
   }
 
-  const canAdvance = [
-    username.length >= 3 && usernameStatus.available === true,
-    accountType !== null,
-    objective !== null,
-    true,
-  ][step];
-
-  function handleNext() {
-    if (step < 3) {
-      setStep(step + 1);
-    }
-  }
-
-  function handleBack() {
-    if (step > 0) {
-      setStep(step - 1);
-    }
-  }
-
-  function handleComplete() {
-    setError("");
+  function submit() {
+    setError(null);
+    const fd = new FormData();
+    fd.set("username", username);
+    fd.set("displayName", displayName || username);
+    fd.set("accountType", accountType);
     startTransition(async () => {
-      const result = await completeOnboarding({
-        userId,
-        username,
-        accountType: accountType!,
-        objective: objective!,
-      });
-
-      if (!result.success) {
-        setError(typeof result.error === "string" ? result.error : "Something went wrong.");
-        return;
+      const result = await createProfile(fd);
+      if (result && !result.success) {
+        setError(result.error ?? "Something went wrong");
       }
-
-      router.push("/dashboard");
     });
   }
 
   return (
-    <div className="w-full max-w-lg">
-      {/* Progress */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Step {step + 1} of 4</span>
-          <span>{Math.round(((step + 1) / 4) * 100)}%</span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
-            style={{ width: `${((step + 1) / 4) * 100}%` }}
-          />
+    <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <div className="mb-6 flex items-center gap-2">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+          <Sparkles className="size-5" aria-hidden />
+        </span>
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">
+            Welcome to {brandConfig.name}
+          </p>
+          <h1 className="text-xl font-semibold tracking-tight">
+            {step === 0 && "Claim your link"}
+            {step === 1 && "What best describes you?"}
+            {step === 2 && "Almost there"}
+          </h1>
         </div>
       </div>
 
-      {/* Card */}
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-        {/* Step 0: Username */}
-        {step === 0 && (
-          <div>
-            <div className="mb-6">
-              <span className="mb-2 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Sparkles className="size-5" />
+      {step === 0 && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 focus-within:ring-2 focus-within:ring-ring">
+              <span className="text-sm text-muted-foreground">
+                {brandConfig.domain}/
               </span>
-              <h2 className="mt-3 text-xl font-semibold">Claim your username</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                This becomes your public URL. You can change it later.
-              </p>
-            </div>
-            <Label htmlFor="username" className="text-sm font-medium">
-              Username
-            </Label>
-            <div className="mt-1.5 flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">biohub.com/</span>
               <Input
                 id="username"
                 value={username}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  handleUsernameChange(e.target.value)
-                }
-                placeholder="yourname"
-                maxLength={30}
+                onChange={(e) => onUsernameChange(e.target.value)}
+                className="min-h-11 border-0 bg-transparent shadow-none focus-visible:ring-0"
+                placeholder="janedoe"
+                autoComplete="off"
                 autoFocus
-                className="flex-1"
               />
-            </div>
-            <div className="mt-2 h-5 text-sm">
-              {usernameStatus.checking && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" /> Checking…
-                </span>
+              {checking && (
+                <Loader2 className="size-4 animate-spin text-muted-foreground" />
               )}
-              {!usernameStatus.checking && usernameStatus.available === true && (
-                <span className="flex items-center gap-1 text-emerald-600">
-                  <Check className="size-3" /> Available!
-                </span>
+              {!checking && availability?.available && (
+                <Check className="size-4 text-green-600" aria-label="Available" />
               )}
-              {!usernameStatus.checking &&
-                usernameStatus.available === false &&
-                usernameStatus.reason && (
-                  <span className="text-destructive">{usernameStatus.reason}</span>
-                )}
             </div>
-          </div>
-        )}
-
-        {/* Step 1: Account type */}
-        {step === 1 && (
-          <div>
-            <h2 className="text-xl font-semibold">What describes you best?</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              We&apos;ll personalize your experience based on this.
-            </p>
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              {ACCOUNT_TYPES.map(({ value, label, icon: Icon }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setAccountType(value)}
-                  className={cn(
-                    "flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 p-4 text-sm font-medium transition-all duration-200",
-                    accountType === value
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border hover:border-primary/40 hover:bg-muted/50",
-                  )}
-                >
-                  <Icon className="size-6" />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Objective */}
-        {step === 2 && (
-          <div>
-            <h2 className="text-xl font-semibold">What&apos;s your main goal?</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              We&apos;ll suggest the best blocks and features for you.
-            </p>
-            <div className="mt-6 flex flex-col gap-3">
-              {OBJECTIVES.map(({ value, label, description, icon: Icon }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setObjective(value)}
-                  className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-xl border-2 p-4 text-left transition-all duration-200",
-                    objective === value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/40 hover:bg-muted/50",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg",
-                      objective === value
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium">{label}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {description}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Review */}
-        {step === 3 && (
-          <div>
-            <h2 className="text-xl font-semibold">You&apos;re all set!</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Review your choices and publish your page.
-            </p>
-            <dl className="mt-6 divide-y divide-border text-sm">
-              <div className="flex items-center justify-between py-3">
-                <dt className="text-muted-foreground">Username</dt>
-                <dd className="font-medium">biohub.com/{username}</dd>
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <dt className="text-muted-foreground">Account type</dt>
-                <dd className="font-medium capitalize">{accountType}</dd>
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <dt className="text-muted-foreground">Primary goal</dt>
-                <dd className="font-medium">
-                  {OBJECTIVES.find((o) => o.value === objective)?.label}
-                </dd>
-              </div>
-            </dl>
-            {error && (
-              <p className="mt-4 text-sm text-destructive">{error}</p>
+            {availability && !availability.available && (
+              <p className="text-sm text-destructive" role="alert">
+                {availability.reason}
+              </p>
             )}
           </div>
-        )}
+          <div className="space-y-2">
+            <Label htmlFor="displayName">Display name</Label>
+            <Input
+              id="displayName"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="min-h-11"
+              placeholder="Jane Doe"
+            />
+          </div>
+          <Button
+            className="min-h-11 w-full cursor-pointer"
+            disabled={!availability?.available || pending}
+            onClick={() => setStep(1)}
+          >
+            Continue
+            <ArrowRight className="size-4" aria-hidden />
+          </Button>
+        </div>
+      )}
 
-        {/* Navigation */}
-        <div className="mt-8 flex items-center justify-between gap-3">
-          {step > 0 ? (
+      {step === 1 && (
+        <div className="space-y-4">
+          <ul className="grid grid-cols-2 gap-2">
+            {ACCOUNT_TYPES.map((type) => (
+              <li key={type}>
+                <button
+                  type="button"
+                  onClick={() => setAccountType(type)}
+                  className={cn(
+                    "flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl border px-3 text-sm font-medium capitalize transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    accountType === type
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {type}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={handleBack}
-              disabled={isPending}
-              className="min-h-10 cursor-pointer gap-1.5"
+              className="min-h-11 flex-1 cursor-pointer"
+              onClick={() => setStep(0)}
             >
-              <ArrowLeft className="size-4" />
               Back
             </Button>
-          ) : (
-            <div />
-          )}
-
-          {step < 3 ? (
             <Button
-              onClick={handleNext}
-              disabled={!canAdvance}
-              className="min-h-10 cursor-pointer gap-1.5"
+              className="min-h-11 flex-1 cursor-pointer"
+              onClick={() => setStep(2)}
             >
               Continue
-              <ArrowRight className="size-4" />
             </Button>
-          ) : (
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Your page will be live at{" "}
+            <span className="font-medium text-foreground">
+              {brandConfig.domain}/{username}
+            </span>
+            . You can customize links and design next.
+          </p>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="flex gap-2">
             <Button
-              onClick={handleComplete}
-              disabled={isPending}
-              className="min-h-10 cursor-pointer gap-1.5"
+              variant="outline"
+              className="min-h-11 flex-1 cursor-pointer"
+              onClick={() => setStep(1)}
+              disabled={pending}
             >
-              {isPending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Creating…
-                </>
+              Back
+            </Button>
+            <Button
+              className="min-h-11 flex-1 cursor-pointer"
+              onClick={submit}
+              disabled={pending}
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : (
                 <>
-                  <Check className="size-4" />
-                  Publish my page
+                  Publish
+                  <ArrowRight className="size-4" aria-hidden />
                 </>
               )}
             </Button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

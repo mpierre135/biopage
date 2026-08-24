@@ -1,47 +1,47 @@
-# BioHub Environment Variables
-
-Copy `.env.example` to `.env.local` and fill in the values.
+# Environment Variables
 
 ## Required
 
-| Variable                          | Description                                            |
-| --------------------------------- | ------------------------------------------------------ |
-| `DATABASE_URL`                    | Neon Postgres connection string (pooled, WebSocket)    |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key (from Clerk dashboard)         |
-| `CLERK_SECRET_KEY`                | Clerk secret key                                       |
-| `CLERK_WEBHOOK_SECRET`            | Signing secret for the Clerk webhook endpoint          |
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string (Neon) |
+| `NEXT_PUBLIC_APP_URL` | Public URL (e.g., `https://biohub.com`) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
+| `CLERK_SECRET_KEY` | Clerk secret key |
 
-## Stripe (optional — required for payments)
+## Authentication (Clerk)
 
-| Variable                    | Description                                    |
-| --------------------------- | ---------------------------------------------- |
-| `STRIPE_SECRET_KEY`         | Stripe secret API key                          |
-| `STRIPE_WEBHOOK_SECRET`     | Signing secret for the Stripe webhook endpoint |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key (client-side)   |
+| Variable | Description |
+|---|---|
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Webhook signature verification |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Sign-in route (default: `/sign-in`) |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Sign-up route (default: `/sign-up`) |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | After sign-in redirect (default: `/onboarding`) |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | After sign-up redirect (default: `/onboarding`) |
 
-## R2 Storage (optional — required for uploads)
+## Payments (Stripe) — Optional
 
-| Variable              | Description                                  |
-| --------------------- | -------------------------------------------- |
-| `R2_ACCOUNT_ID`       | Cloudflare account ID                        |
-| `R2_ACCESS_KEY_ID`    | R2 S3-compatible access key ID               |
-| `R2_SECRET_ACCESS_KEY`| R2 S3-compatible secret access key           |
-| `R2_BUCKET_NAME`      | R2 bucket name (e.g. `biohub-uploads`)       |
-| `R2_PUBLIC_URL`       | Public URL prefix for the bucket             |
+| Variable | Description |
+|---|---|
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signature secret |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
 
-## Email (optional — required for transactional email)
+## Email (Resend) — Optional
 
-| Variable          | Description                       |
-| ----------------- | --------------------------------- |
-| `RESEND_API_KEY`  | Resend API key                    |
-| `EMAIL_FROM`      | Sender address (e.g. `noreply@biohub.com`) |
+| Variable | Description |
+|---|---|
+| `RESEND_API_KEY` | Resend API key |
+| `EMAIL_FROM` | Sender address (e.g., `BioHub <noreply@biohub.com>`) |
 
-## App Configuration
+## Storage (R2/S3) — Optional
 
-| Variable                          | Description                                                  |
-| --------------------------------- | ------------------------------------------------------------ |
-| `NEXT_PUBLIC_APP_URL`             | Public URL of the app (e.g. `https://biohub.com`)            |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`   | Sign-in page path (default: `/sign-in`)                      |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`   | Sign-up page path (default: `/sign-up`)                      |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` | Redirect after sign-in (default: `/dashboard`)           |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL` | Redirect after sign-up (default: `/onboarding`)          |
+| Variable | Description |
+|---|---|
+| `R2_ACCOUNT_ID` | Cloudflare account ID |
+| `R2_ACCESS_KEY_ID` | R2 access key |
+| `R2_SECRET_ACCESS_KEY` | R2 secret key |
+| `R2_BUCKET_NAME` | Bucket name (default: `biohub`) |
+| `R2_PUBLIC_URL` | Public bucket URL |
+
+Without R2 variables, file uploads fall back to local disk (`.uploads/` directory, not persisted on serverless).

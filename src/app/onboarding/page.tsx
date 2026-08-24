@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
 import { getCurrentDbUser } from "@/lib/auth/session";
-import { OnboardingWizard } from "./wizard";
+import { OnboardingForm } from "./onboarding-form";
+import type { Metadata } from "next";
 
-export const metadata = { title: "Get Started | BioHub" };
+export const metadata: Metadata = {
+  title: "Get Started",
+};
 
 export default async function OnboardingPage() {
   const user = await getCurrentDbUser();
@@ -12,8 +15,10 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background px-4 py-12">
-      <OnboardingWizard userId={user.id} />
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-violet-50 px-4">
+      <OnboardingForm
+        firstName={user.firstName ?? ""}
+      />
     </div>
   );
 }

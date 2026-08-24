@@ -1,177 +1,173 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { QrCode, Download, Palette } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { QrCode, Download, Copy, Check } from "lucide-react";
+import QRCode from "qrcode";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { brandConfig } from "@/lib/brand";
 
-export default function QrCodePage() {
+export default function QRCodePage() {
+  const [url, setUrl] = useState("");
   const [foreground, setForeground] = useState("#000000");
   const [background, setBackground] = useState("#ffffff");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [profileUrl, setProfileUrl] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    async function loadQr() {
-      try {
-        const res = await fetch("/api/profile/me");
-        if (res.ok) {
-          const data = await res.json();
-          const url =
-            typeof window !== "undefined"
-              ? `${window.location.origin}/${data.username}`
-              : `/${data.username}`;
-          setProfileUrl(url);
-        }
-      } catch {
-        // use fallback
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadQr();
+    const baseUrl =
+      typeof window !== "undefined" ? window.location.origin : "";
+    setUrl(baseUrl);
   }, []);
 
-  useEffect(() => {
-    if (!profileUrl) return;
-
-    async function generateQr() {
-      try {
-        const QRCode = (await import("qrcode")).default;
-        const dataUrl = await QRCode.toDataURL(profileUrl, {
-          width: 512,
-          margin: 2,
-          color: {
-            dark: foreground,
-            light: background,
-          },
-        });
-        setQrDataUrl(dataUrl);
-      } catch {
-        // fallback
-      }
+  const generateQR = useCallback(async () => {
+    if (!url) return;
+    try {
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 512,
+        margin: 2,
+        color: {
+          dark: foreground,
+          light: background,
+        },
+      });
+      setQrDataUrl(dataUrl);
+    } catch {
+      setQrDataUrl(null);
     }
-    generateQr();
-  }, [profileUrl, foreground, background]);
+  }, [url, foreground, background]);
+
+  useEffect(() => {
+    generateQR();
+  }, [generateQR]);
 
   function handleDownload() {
     if (!qrDataUrl) return;
     const link = document.createElement("a");
-    link.download = "biohub-qr.png";
+    link.download = `${brandConfig.name.toLowerCase()}-qr.png`;
     link.href = qrDataUrl;
     link.click();
   }
 
+  async function handleCopyUrl() {
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">QR Code</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Generate a QR code for your bio page to share anywhere.
+        <h1 className="text-2xl font-semibold text-foreground">QR Code</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Generate a QR code for your page. Download and share anywhere.
         </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* QR Preview */}
         <Card>
           <CardHeader>
-            <CardTitle>Preview</CardTitle>
+            <CardTitle className="text-base">Customize</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col items-center">
-            {loading ? (
-              <div className="flex size-64 items-center justify-center">
-                <div className="size-8 animate-spin rounded-full border-2 border-slate-300 border-t-indigo-600" />
-              </div>
-            ) : qrDataUrl ? (
-              <img
-                src={qrDataUrl}
-                alt="QR Code for your bio page"
-                className="size-64 rounded-lg"
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="qr-url">Page URL</Label>
+              <Input
+                id="qr-url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://biohub.com/yourname"
               />
-            ) : (
-              <div className="flex size-64 flex-col items-center justify-center rounded-lg bg-slate-50">
-                <QrCode className="size-12 text-slate-300" />
-                <p className="mt-2 text-sm text-slate-500">
-                  QR code will appear here
-                </p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="qr-fg">Foreground</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="qr-fg"
+                    type="color"
+                    value={foreground}
+                    onChange={(e) => setForeground(e.target.value)}
+                    className="h-9 w-9 cursor-pointer rounded border border-border"
+                  />
+                  <Input
+                    value={foreground}
+                    onChange={(e) => setForeground(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
               </div>
-            )}
-            {profileUrl && (
-              <p className="mt-3 text-sm text-slate-500 break-all text-center">
-                {profileUrl}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Customization */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="size-4" />
-              Customize
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label htmlFor="qr-foreground" className="text-sm font-medium text-slate-700">
-                Foreground Color
-              </Label>
-              <div className="mt-2 flex items-center gap-3">
-                <input
-                  id="qr-foreground"
-                  type="color"
-                  value={foreground}
-                  onChange={(e) => setForeground(e.target.value)}
-                  className="size-10 cursor-pointer rounded-lg border border-slate-200 p-1"
-                />
-                <Input
-                  value={foreground}
-                  onChange={(e) => setForeground(e.target.value)}
-                  className="max-w-[120px] font-mono text-sm"
-                />
+              <div className="space-y-2">
+                <Label htmlFor="qr-bg">Background</Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="qr-bg"
+                    type="color"
+                    value={background}
+                    onChange={(e) => setBackground(e.target.value)}
+                    className="h-9 w-9 cursor-pointer rounded border border-border"
+                  />
+                  <Input
+                    value={background}
+                    onChange={(e) => setBackground(e.target.value)}
+                    className="flex-1"
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="qr-background" className="text-sm font-medium text-slate-700">
-                Background Color
-              </Label>
-              <div className="mt-2 flex items-center gap-3">
-                <input
-                  id="qr-background"
-                  type="color"
-                  value={background}
-                  onChange={(e) => setBackground(e.target.value)}
-                  className="size-10 cursor-pointer rounded-lg border border-slate-200 p-1"
-                />
-                <Input
-                  value={background}
-                  onChange={(e) => setBackground(e.target.value)}
-                  className="max-w-[120px] font-mono text-sm"
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-200">
+            <div className="flex gap-2 pt-2">
               <Button
                 onClick={handleDownload}
                 disabled={!qrDataUrl}
-                className="w-full cursor-pointer gap-2 min-h-[44px]"
+                className="cursor-pointer min-h-11 gap-2 flex-1"
               >
-                <Download className="size-4" />
+                <Download className="h-4 w-4" />
                 Download PNG
+              </Button>
+              <Button
+                onClick={handleCopyUrl}
+                variant="outline"
+                className="cursor-pointer min-h-11 gap-2"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+                {copied ? "Copied" : "Copy URL"}
               </Button>
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      <canvas ref={canvasRef} className="hidden" />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <QrCode className="h-4 w-4 text-muted-foreground" />
+              Preview
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center py-8">
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt="QR Code"
+                className="h-64 w-64 rounded-lg"
+              />
+            ) : (
+              <div className="flex h-64 w-64 items-center justify-center rounded-lg border-2 border-dashed border-border">
+                <p className="text-sm text-muted-foreground">
+                  Enter a URL to generate
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -4,304 +4,170 @@ import ws from "ws";
 import * as schema from "../src/lib/db/schema";
 import { THEME_PRESETS } from "../src/lib/themes/presets";
 import { RESERVED_USERNAMES } from "../src/lib/security/usernames";
-import { FEATURE_KEYS } from "../src/lib/billing/features";
 
-const db = drizzle({ connection: process.env.DATABASE_URL!, schema, ws });
+const db = drizzle({
+  connection: process.env.DATABASE_URL!,
+  schema,
+  ws,
+});
 
-type PlanRow = typeof schema.plans.$inferSelect;
-type FeatureRow = typeof schema.features.$inferSelect;
+async function seedPlans() {
+  console.log("Seeding plans...");
 
-const PLAN_FEATURE_MAP: Record<string, string[]> = {
-  free: ["leadCapture"],
-  creator: [
-    "removeBranding",
-    "advancedAnalytics",
-    "customThemes",
-    "scheduledLinks",
-    "leadCapture",
-  ],
-  pro: [
-    "removeBranding",
-    "advancedAnalytics",
-    "customThemes",
-    "scheduledLinks",
-    "leadCapture",
-    "customDomain",
-    "digitalProducts",
-    "integrations",
-    "csvExport",
-    "qrCustomization",
-  ],
-  business: [
-    "removeBranding",
-    "advancedAnalytics",
-    "customThemes",
-    "scheduledLinks",
-    "leadCapture",
-    "customDomain",
-    "digitalProducts",
-    "integrations",
-    "csvExport",
-    "qrCustomization",
-    "pixels",
-    "advancedRouting",
-    "abTesting",
-    "multipleProfiles",
-    "teams",
-  ],
-};
+  const planData = [
+    { name: "Free", slug: "free", description: "Perfect for getting started", monthlyPrice: "0", annualPrice: "0", sortOrder: 0 },
+    { name: "Creator", slug: "creator", description: "For serious content creators", monthlyPrice: "9", annualPrice: "84", sortOrder: 1 },
+    { name: "Pro", slug: "pro", description: "Unlock your full potential", monthlyPrice: "19", annualPrice: "180", sortOrder: 2 },
+    { name: "Business", slug: "business", description: "For teams and enterprises", monthlyPrice: "49", annualPrice: "468", sortOrder: 3 },
+  ];
 
-async function seed() {
-  console.log("🌱 Seeding database…\n");
-
-  // ── 1. Plans ─────────────────────────────────────────────────────────
-  console.log("  Plans…");
-  const planRows = await db
-    .insert(schema.plans)
-    .values([
-      {
-        name: "Free",
-        slug: "free",
-        description: "Get started for free",
-        monthlyPrice: "0",
-        annualPrice: "0",
-        sortOrder: 0,
-      },
-      {
-        name: "Creator",
-        slug: "creator",
-        description: "For growing creators",
-        monthlyPrice: "9",
-        annualPrice: "86.40",
-        sortOrder: 1,
-      },
-      {
-        name: "Pro",
-        slug: "pro",
-        description: "For serious creators",
-        monthlyPrice: "19",
-        annualPrice: "182.40",
-        sortOrder: 2,
-      },
-      {
-        name: "Business",
-        slug: "business",
-        description: "For teams and businesses",
-        monthlyPrice: "49",
-        annualPrice: "470.40",
-        sortOrder: 3,
-      },
-    ])
-    .onConflictDoNothing()
-    .returning();
-
-  const plansBySlug = Object.fromEntries(
-    planRows.map((p: PlanRow) => [p.slug, p]),
-  );
-  console.log(`    ✓ ${planRows.length} plans`);
-
-  // ── 2. Features ──────────────────────────────────────────────────────
-  console.log("  Features…");
-  const featureRows = await db
-    .insert(schema.features)
-    .values(
-      FEATURE_KEYS.map((key) => ({
-        key,
-        name: key
-          .replace(/([A-Z])/g, " $1")
-          .replace(/^./, (s) => s.toUpperCase()),
-        description: `${key} feature`,
-      })),
-    )
-    .onConflictDoNothing()
-    .returning();
-
-  const featuresByKey = Object.fromEntries(
-    featureRows.map((f: FeatureRow) => [f.key, f]),
-  );
-  console.log(`    ✓ ${featureRows.length} features`);
-
-  // ── 3. Plan ↔ Feature mapping ────────────────────────────────────────
-  console.log("  Plan features…");
-  const planFeatureValues: {
-    planId: string;
-    featureId: string;
-    limitValue: null;
-  }[] = [];
-
-  for (const [slug, keys] of Object.entries(PLAN_FEATURE_MAP)) {
-    const plan = plansBySlug[slug];
-    if (!plan) continue;
-
-    for (const key of keys) {
-      const feature = featuresByKey[key];
-      if (!feature) continue;
-      planFeatureValues.push({
-        planId: plan.id,
-        featureId: feature.id,
-        limitValue: null,
-      });
-    }
-  }
-
-  if (planFeatureValues.length > 0) {
+  for (const plan of planData) {
     await db
-      .insert(schema.planFeatures)
-      .values(planFeatureValues)
-      .onConflictDoNothing();
-  }
-  console.log(`    ✓ ${planFeatureValues.length} plan-feature mappings`);
-
-  // ── 4. Themes ────────────────────────────────────────────────────────
-  console.log("  Themes…");
-  const themeRows = await db
-    .insert(schema.themes)
-    .values(
-      THEME_PRESETS.map((t) => ({
-        name: t.name,
-        slug: t.slug,
-        category: t.category,
-        isPremium: t.isPremium,
-        config: t.config as Record<string, unknown>,
-      })),
-    )
-    .onConflictDoNothing()
-    .returning();
-  console.log(`    ✓ ${themeRows.length} themes`);
-
-  // ── 5. Reserved usernames ────────────────────────────────────────────
-  console.log("  Reserved usernames…");
-  const usernameValues = Array.from(RESERVED_USERNAMES).map((u) => ({
-    username: u,
-    reason: "system-reserved",
-  }));
-  await db
-    .insert(schema.reservedUsernames)
-    .values(usernameValues)
-    .onConflictDoNothing();
-  console.log(`    ✓ ${usernameValues.length} reserved usernames`);
-
-  // ── 6. Demo profile (janedoe) ────────────────────────────────────────
-  console.log("  Demo profile…");
-
-  // Fake Clerk ID — this user is for demo/dev only and is not backed by
-  // a real Clerk account. In production the user sync webhook would
-  // create this row; here we insert manually so the public page works.
-  const DEMO_CLERK_ID = "demo_clerk_janedoe";
-
-  const [demoUser] = await db
-    .insert(schema.users)
-    .values({
-      clerkId: DEMO_CLERK_ID,
-      email: "jane@example.com",
-      firstName: "Jane",
-      lastName: "Doe",
-      onboardingCompleted: true,
-    })
-    .onConflictDoNothing()
-    .returning();
-
-  if (demoUser) {
-    const defaultTheme = themeRows.find(
-      (t: (typeof themeRows)[number]) => t.slug === "clean-slate",
-    );
-
-    const [demoProfile] = await db
-      .insert(schema.profiles)
-      .values({
-        userId: demoUser.id,
-        username: "janedoe",
-        displayName: "Jane Doe",
-        bio: "Designer, creator & coffee enthusiast. Building cool things on the internet. ✨",
-        isPublished: true,
-        visibility: "public",
-        themeId: defaultTheme?.id ?? null,
-      })
-      .onConflictDoNothing()
-      .returning();
-
-    if (demoProfile) {
-      await db
-        .insert(schema.blocks)
-        .values([
-          {
-            profileId: demoProfile.id,
-            type: "HEADER" as const,
-            position: 0,
-            enabled: true,
-            config: { title: "Hey, I'm Jane 👋" },
-          },
-          {
-            profileId: demoProfile.id,
-            type: "LINK" as const,
-            position: 1,
-            enabled: true,
-            config: {
-              title: "My Portfolio",
-              url: "https://example.com/portfolio",
-              icon: "globe",
-            },
-          },
-          {
-            profileId: demoProfile.id,
-            type: "LINK" as const,
-            position: 2,
-            enabled: true,
-            config: {
-              title: "Follow me on Twitter",
-              url: "https://twitter.com/janedoe",
-              icon: "twitter",
-            },
-          },
-          {
-            profileId: demoProfile.id,
-            type: "LINK" as const,
-            position: 3,
-            enabled: true,
-            config: {
-              title: "Subscribe to my Newsletter",
-              url: "https://example.com/newsletter",
-              icon: "mail",
-            },
-          },
-          {
-            profileId: demoProfile.id,
-            type: "EMAIL_CAPTURE" as const,
-            position: 4,
-            enabled: true,
-            config: {
-              heading: "Join my mailing list",
-              description: "Get weekly design tips & inspiration",
-              buttonText: "Subscribe",
-              successMessage: "You're in! 🎉",
-            },
-          },
-          {
-            profileId: demoProfile.id,
-            type: "DIVIDER" as const,
-            position: 5,
-            enabled: true,
-            config: { style: "line" },
-          },
-        ])
-        .onConflictDoNothing();
-
-      console.log(
-        `    ✓ Demo user + profile "janedoe" with 6 blocks`,
-      );
-    } else {
-      console.log("    ⏭ Demo profile already exists, skipping");
-    }
-  } else {
-    console.log("    ⏭ Demo user already exists, skipping");
+      .insert(schema.plans)
+      .values(plan)
+      .onConflictDoUpdate({
+        target: schema.plans.slug,
+        set: {
+          name: plan.name,
+          description: plan.description,
+          monthlyPrice: plan.monthlyPrice,
+          annualPrice: plan.annualPrice,
+          sortOrder: plan.sortOrder,
+        },
+      });
   }
 
-  console.log("\n✅ Seeding complete!");
+  console.log(`  ${planData.length} plans seeded.`);
 }
 
-seed()
-  .catch((err) => {
-    console.error("Seed failed:", err);
-    process.exit(1);
-  })
-  .finally(() => process.exit(0));
+async function seedFeatures() {
+  console.log("Seeding features...");
+
+  const featureData = [
+    { key: "removeBranding", name: "Remove Branding", description: "Hide BioHub badge from your page" },
+    { key: "advancedAnalytics", name: "Advanced Analytics", description: "Detailed traffic reports and exports" },
+    { key: "customThemes", name: "Custom Themes", description: "Access to premium themes and custom CSS" },
+    { key: "scheduledLinks", name: "Scheduled Links", description: "Set publish/expire dates for links" },
+    { key: "leadCapture", name: "Lead Capture", description: "Email and SMS capture forms" },
+    { key: "customDomain", name: "Custom Domain", description: "Use your own domain" },
+    { key: "digitalProducts", name: "Digital Products", description: "Sell downloadable files" },
+    { key: "integrations", name: "Integrations", description: "Connect to third-party tools" },
+    { key: "pixels", name: "Tracking Pixels", description: "Add Facebook, Google, TikTok pixels" },
+    { key: "advancedRouting", name: "Advanced Routing", description: "Geo and device-based link routing" },
+    { key: "abTesting", name: "A/B Testing", description: "Test different page layouts" },
+    { key: "multipleProfiles", name: "Multiple Profiles", description: "Manage several bio pages" },
+    { key: "teams", name: "Team Collaboration", description: "Invite team members with roles" },
+    { key: "csvExport", name: "CSV Export", description: "Export audience contacts" },
+    { key: "qrCustomization", name: "QR Customization", description: "Custom QR colors and branding" },
+  ];
+
+  for (const feat of featureData) {
+    await db
+      .insert(schema.features)
+      .values(feat)
+      .onConflictDoUpdate({
+        target: schema.features.key,
+        set: { name: feat.name, description: feat.description },
+      });
+  }
+
+  console.log(`  ${featureData.length} features seeded.`);
+}
+
+async function seedPlanFeatures() {
+  console.log("Seeding plan features...");
+
+  const allPlans = await db.select().from(schema.plans);
+  const allFeatures = await db.select().from(schema.features);
+
+  const planMap = new Map(allPlans.map((p) => [p.slug, p.id]));
+  const featMap = new Map(allFeatures.map((f) => [f.key, f.id]));
+
+  const matrix: Record<string, string[]> = {
+    free: ["leadCapture"],
+    creator: ["removeBranding", "advancedAnalytics", "customThemes", "scheduledLinks", "leadCapture", "customDomain", "qrCustomization"],
+    pro: ["removeBranding", "advancedAnalytics", "customThemes", "scheduledLinks", "leadCapture", "customDomain", "digitalProducts", "integrations", "pixels", "multipleProfiles", "csvExport", "qrCustomization"],
+    business: ["removeBranding", "advancedAnalytics", "customThemes", "scheduledLinks", "leadCapture", "customDomain", "digitalProducts", "integrations", "pixels", "advancedRouting", "abTesting", "multipleProfiles", "teams", "csvExport", "qrCustomization"],
+  };
+
+  let count = 0;
+  for (const [planSlug, featureKeys] of Object.entries(matrix)) {
+    const planId = planMap.get(planSlug);
+    if (!planId) continue;
+
+    for (const key of featureKeys) {
+      const featureId = featMap.get(key);
+      if (!featureId) continue;
+
+      await db
+        .insert(schema.planFeatures)
+        .values({ planId, featureId })
+        .onConflictDoNothing();
+      count++;
+    }
+  }
+
+  console.log(`  ${count} plan-feature links seeded.`);
+}
+
+async function seedReservedUsernames() {
+  console.log("Seeding reserved usernames...");
+
+  const usernames = Array.from(RESERVED_USERNAMES);
+  let count = 0;
+
+  for (const username of usernames) {
+    await db
+      .insert(schema.reservedUsernames)
+      .values({ username, reason: "System reserved" })
+      .onConflictDoNothing();
+    count++;
+  }
+
+  console.log(`  ${count} reserved usernames seeded.`);
+}
+
+async function seedThemes() {
+  console.log("Seeding themes...");
+
+  for (const preset of THEME_PRESETS) {
+    await db
+      .insert(schema.themes)
+      .values({
+        name: preset.name,
+        slug: preset.slug,
+        category: preset.category,
+        isPremium: preset.isPremium,
+        config: preset.config as Record<string, unknown>,
+      })
+      .onConflictDoUpdate({
+        target: schema.themes.slug,
+        set: {
+          name: preset.name,
+          category: preset.category,
+          isPremium: preset.isPremium,
+          config: preset.config as Record<string, unknown>,
+        },
+      });
+  }
+
+  console.log(`  ${THEME_PRESETS.length} themes seeded.`);
+}
+
+async function main() {
+  console.log("Starting seed...\n");
+
+  await seedPlans();
+  await seedFeatures();
+  await seedPlanFeatures();
+  await seedReservedUsernames();
+  await seedThemes();
+
+  console.log("\nSeed completed successfully!");
+  process.exit(0);
+}
+
+main().catch((err) => {
+  console.error("Seed failed:", err);
+  process.exit(1);
+});

@@ -1,19 +1,16 @@
-import { eq, desc } from "drizzle-orm";
-import { Users, Search } from "lucide-react";
-import { getCurrentDbUser } from "@/lib/auth/session";
+import { eq, desc, sql } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { Users, Mail, Phone, Download } from "lucide-react";
 import { db } from "@/lib/db";
 import { profiles, audienceContacts } from "@/lib/db/schema";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+import { getCurrentDbUser } from "@/lib/auth/session";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Audience",
+};
 
 export default async function AudiencePage() {
   const user = await getCurrentDbUser();
@@ -24,97 +21,131 @@ export default async function AudiencePage() {
     .where(eq(profiles.userId, user.id))
     .limit(1);
 
-  const contacts = profile
-    ? await db
-        .select()
-        .from(audienceContacts)
-        .where(eq(audienceContacts.profileId, profile.id))
-        .orderBy(desc(audienceContacts.createdAt))
-        .limit(100)
-    : [];
+  if (!profile) redirect("/onboarding");
+
+  const contacts = await db
+    .select()
+    .from(audienceContacts)
+    .where(eq(audienceContacts.profileId, profile.id))
+    .orderBy(desc(audienceContacts.createdAt))
+    .limit(100);
+
+  const [countRow] = await db
+    .select({ total: sql<number>`COUNT(*)` })
+    .from(audienceContacts)
+    .where(eq(audienceContacts.profileId, profile.id));
+
+  const totalContacts = Number(countRow?.total ?? 0);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Audience</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Manage contacts captured from your bio page.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Audience</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {totalContacts} contact{totalContacts !== 1 ? "s" : ""} captured.
+          </p>
+        </div>
       </div>
 
-      {contacts.length === 0 ? (
+      <div className="grid gap-4 sm:grid-cols-3">
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Users className="size-12 text-slate-300" />
-            <p className="mt-4 text-sm font-medium text-slate-900">
-              No contacts yet
-            </p>
-            <p className="mt-1 max-w-sm text-center text-sm text-slate-500">
-              When visitors submit their info through your email capture or form
-              blocks, they&apos;ll appear here.
-            </p>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">
+                  {totalContacts.toLocaleString()}
+                </p>
+              </div>
+              <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-50">
+                <Users className="size-5 text-indigo-600" />
+              </div>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-              <Input
-                placeholder="Search contacts..."
-                className="pl-9"
-                readOnly
-              />
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Emails</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">
+                  {contacts.filter((c) => c.email).length}
+                </p>
+              </div>
+              <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-50">
+                <Mail className="size-5 text-indigo-600" />
+              </div>
             </div>
-            <Badge variant="secondary">{contacts.length} contacts</Badge>
-          </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">SMS</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">
+                  {contacts.filter((c) => c.phone).length}
+                </p>
+              </div>
+              <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-50">
+                <Phone className="size-5 text-indigo-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-          <Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent Contacts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {contacts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No contacts yet. Add email or SMS capture blocks to start collecting leads.
+            </p>
+          ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="pb-2 text-left font-medium text-muted-foreground">Contact</th>
+                    <th className="pb-2 text-left font-medium text-muted-foreground">Source</th>
+                    <th className="pb-2 text-left font-medium text-muted-foreground">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
                   {contacts.map((contact) => (
-                    <TableRow key={contact.id}>
-                      <TableCell className="font-medium text-slate-900">
-                        {[contact.firstName, contact.lastName]
-                          .filter(Boolean)
-                          .join(" ") || "—"}
-                      </TableCell>
-                      <TableCell className="text-slate-600">
-                        {contact.email ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-slate-600">
-                        {contact.phone ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        {contact.source ? (
-                          <Badge variant="secondary" className="text-xs">
-                            {contact.source}
-                          </Badge>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="text-slate-600">
-                        {new Date(contact.createdAt).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
+                    <tr key={contact.id}>
+                      <td className="py-3">
+                        <div>
+                          {contact.firstName && (
+                            <p className="font-medium text-foreground">
+                              {contact.firstName} {contact.lastName ?? ""}
+                            </p>
+                          )}
+                          <p className="text-muted-foreground">
+                            {contact.email ?? contact.phone ?? "—"}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <Badge variant="secondary" className="capitalize">
+                          {contact.source?.replace("_", " ") ?? "unknown"}
+                        </Badge>
+                      </td>
+                      <td className="py-3 text-muted-foreground">
+                        {contact.createdAt.toLocaleDateString()}
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </Card>
-        </>
-      )}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
