@@ -45,3 +45,24 @@
 | `R2_PUBLIC_URL` | Public bucket URL |
 
 Without R2 variables, file uploads fall back to local disk (`.uploads/` directory, not persisted on serverless).
+
+## Product integrations (optional)
+
+These power **Dashboard → Integrations**. Creators sign in with Clerk; then they connect *their* Shopify / Spotify / Meta / email tools. Without the platform app credentials below, OAuth buttons stay hidden and people can still paste pixel IDs, Shopify store URLs, and email API keys.
+
+Redirect URLs to allowlist on each developer app:
+
+- `https://YOUR_DOMAIN/api/integrations/shopify/callback`
+- `https://YOUR_DOMAIN/api/integrations/spotify/callback`
+- `https://YOUR_DOMAIN/api/integrations/meta/callback`
+
+| Variable | Description |
+|---|---|
+| `SHOPIFY_CLIENT_ID` | Shopify custom app client ID (per-store OAuth) |
+| `SHOPIFY_CLIENT_SECRET` | Shopify custom app secret |
+| `SPOTIFY_CLIENT_ID` | Spotify developer app client ID |
+| `SPOTIFY_CLIENT_SECRET` | Spotify developer app secret |
+| `META_APP_ID` | Meta (Facebook) app ID for optional ad-account login |
+| `META_APP_SECRET` | Meta app secret |
+
+Pixels (Meta / Google / TikTok) do **not** need these. They use a pixel ID pasted in **Dashboard → Pixels**. Facebook and Instagram ads share the same Meta Pixel.

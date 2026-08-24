@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { ingestEvent } from "@/lib/analytics/ingest";
 import { FORM_SUBMIT } from "@/lib/analytics/events";
+import { forwardCapturedLead } from "@/lib/integrations/destinations";
 
 const schema = z.object({
   profileUsername: z.string().min(1).max(64),
@@ -55,6 +56,10 @@ export async function POST(req: NextRequest) {
         })
         .returning({ id: audienceContacts.id });
       contactId = contact.id;
+      await forwardCapturedLead(profile.id, {
+        email,
+        firstName: values.firstName || values.name || null,
+      });
     }
 
     // Ensure a lightweight form record exists for this profile (block-backed)

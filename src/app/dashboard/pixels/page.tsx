@@ -47,7 +47,9 @@ export default async function PixelsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Pixels</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect ad pixels that fire on your public bio page.
+          Connect ad pixels that fire on your public bio page. Facebook and
+          Instagram ads share the same Meta Pixel. Google and TikTok each use
+          their own ID.
         </p>
       </div>
       <PixelsClient canUse={canUse} initial={initial} />

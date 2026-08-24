@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { profiles, audienceContacts } from "@/lib/db/schema";
+import { forwardCapturedLead } from "@/lib/integrations/destinations";
 
 const captureSchema = z.object({
   type: z.enum(["email", "sms"]),
@@ -59,6 +60,8 @@ export async function POST(req: NextRequest) {
       source: type === "email" ? "email_capture" : "sms_capture",
       blockId: blockId ?? null,
     });
+
+    await forwardCapturedLead(profile.id, { email, phone, firstName });
 
     return NextResponse.json({ success: true });
   } catch {

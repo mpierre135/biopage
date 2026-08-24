@@ -25,6 +25,8 @@ export async function createProduct(
     description?: string;
     price: string;
     currency?: string;
+    thumbnail?: string;
+    externalUrl?: string;
   },
 ): Promise<ActionResult> {
   const user = await getCurrentDbUser();
@@ -50,6 +52,8 @@ export async function createProduct(
       description: data.description?.trim() || null,
       price: price.toFixed(2),
       currency: data.currency ?? "usd",
+      thumbnail: data.thumbnail?.trim() || null,
+      externalUrl: data.externalUrl?.trim() || null,
       status: "active",
     })
     .returning({ id: products.id });

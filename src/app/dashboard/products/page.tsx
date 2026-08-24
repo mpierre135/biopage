@@ -121,6 +121,9 @@ export default async function ProductsPage() {
                     <Package className="h-3.5 w-3.5" />
                     {product.inventorySold} sold
                   </span>
+                  {product.externalUrl ? (
+                    <Badge variant="outline">External checkout</Badge>
+                  ) : null}
                 </div>
                 <ProductFileAttach
                   productId={product.id}

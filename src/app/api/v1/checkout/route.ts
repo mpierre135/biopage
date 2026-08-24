@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { products, profiles } from "@/lib/db/schema";
+import { isSafeUrl } from "@/lib/security/urls";
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -13,14 +14,6 @@ function getStripe() {
 }
 
 export async function GET(req: NextRequest) {
-  const stripe = getStripe();
-  if (!stripe) {
-    return NextResponse.json(
-      { error: "Payments are not configured. Please set STRIPE_SECRET_KEY." },
-      { status: 503 },
-    );
-  }
-
   const productId = req.nextUrl.searchParams.get("productId");
   if (!productId) {
     return NextResponse.json(
@@ -39,6 +32,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       { error: "Product not found or not active" },
       { status: 404 },
+    );
+  }
+
+  if (product.externalUrl) {
+    if (!isSafeUrl(product.externalUrl)) {
+      return NextResponse.json({ error: "Invalid product URL" }, { status: 400 });
+    }
+    return NextResponse.redirect(product.externalUrl, 303);
+  }
+
+  const stripe = getStripe();
+  if (!stripe) {
+    return NextResponse.json(
+      { error: "Payments are not configured. Please set STRIPE_SECRET_KEY." },
+      { status: 503 },
     );
   }
 

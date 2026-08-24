@@ -16,6 +16,7 @@ import {
   Settings,
   Menu,
   Crosshair,
+  Plug,
   FlaskConical,
   UserCog,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const navItems = [
   { href: "/dashboard/audience", label: "Audience", icon: Users },
   { href: "/dashboard/products", label: "Products", icon: ShoppingBag },
   { href: "/dashboard/pixels", label: "Pixels", icon: Crosshair },
+  { href: "/dashboard/integrations", label: "Integrations", icon: Plug },
   { href: "/dashboard/experiments", label: "Experiments", icon: FlaskConical },
   { href: "/dashboard/team", label: "Team", icon: UserCog },
   { href: "/dashboard/qr", label: "QR Code", icon: QrCode },

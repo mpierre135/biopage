@@ -212,6 +212,7 @@ export const products = pgTable("products", {
   status: varchar("status", { length: 32 }).default("draft").notNull(),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
+  externalUrl: text("external_url"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
