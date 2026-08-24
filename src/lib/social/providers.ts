@@ -1,203 +1,197 @@
-/**
- * Registry of supported social platforms.
- *
- * `urlPattern` is a RegExp that validates user-supplied URLs for that
- * provider. It is intentionally permissive — just enough to catch obvious
- * mistakes; the `isSafeUrl` check in security/urls.ts is the real gate.
- */
+import {
+  Globe,
+  Mail,
+  Phone,
+  Music,
+  Music2,
+  MessageCircle,
+  Hash,
+  User,
+  Link,
+  type LucideIcon,
+} from "lucide-react";
 
-export type SocialProvider = {
-  /** Unique key used in the database `provider` column. */
-  key: string;
-  /** Human-readable display label. */
+export interface SocialProvider {
+  id: string;
   label: string;
-  /** Icon identifier (maps to your icon library, e.g. Lucide or Simple Icons). */
-  icon: string;
-  /** Placeholder or example URL shown in the UI. */
+  icon: LucideIcon;
+  baseUrl?: string;
   placeholder: string;
-  /** Optional: validates the URL structure for this provider. */
-  urlPattern?: RegExp;
-  /** When true, the "URL" is actually an email address. */
-  isEmail?: boolean;
-  /** When true, the "URL" is a tel: link. */
-  isPhone?: boolean;
-};
+  color: string;
+  prefixHandle?: boolean;
+}
 
 export const SOCIAL_PROVIDERS: SocialProvider[] = [
   {
-    key: "instagram",
+    id: "instagram",
     label: "Instagram",
-    icon: "instagram",
-    placeholder: "https://instagram.com/username",
-    urlPattern: /instagram\.com\//i,
+    icon: User,
+    baseUrl: "https://instagram.com/",
+    placeholder: "username",
+    color: "#E1306C",
+    prefixHandle: true,
   },
   {
-    key: "tiktok",
+    id: "tiktok",
     label: "TikTok",
-    icon: "tiktok",
-    placeholder: "https://tiktok.com/@username",
-    urlPattern: /tiktok\.com\//i,
+    icon: Music,
+    baseUrl: "https://tiktok.com/@",
+    placeholder: "username",
+    color: "#010101",
+    prefixHandle: true,
   },
   {
-    key: "youtube",
+    id: "youtube",
     label: "YouTube",
-    icon: "youtube",
-    placeholder: "https://youtube.com/@channel",
-    urlPattern: /youtube\.com\//i,
+    icon: Music2,
+    baseUrl: "https://youtube.com/@",
+    placeholder: "channel or @handle",
+    color: "#FF0000",
   },
   {
-    key: "x",
+    id: "x",
     label: "X (Twitter)",
-    icon: "x",
-    placeholder: "https://x.com/username",
-    urlPattern: /(twitter|x)\.com\//i,
+    icon: Hash,
+    baseUrl: "https://x.com/",
+    placeholder: "username",
+    color: "#000000",
+    prefixHandle: true,
   },
   {
-    key: "linkedin",
-    label: "LinkedIn",
-    icon: "linkedin",
-    placeholder: "https://linkedin.com/in/username",
-    urlPattern: /linkedin\.com\//i,
-  },
-  {
-    key: "github",
-    label: "GitHub",
-    icon: "github",
-    placeholder: "https://github.com/username",
-    urlPattern: /github\.com\//i,
-  },
-  {
-    key: "facebook",
+    id: "facebook",
     label: "Facebook",
-    icon: "facebook",
-    placeholder: "https://facebook.com/username",
-    urlPattern: /facebook\.com\//i,
+    icon: User,
+    baseUrl: "https://facebook.com/",
+    placeholder: "username or page",
+    color: "#1877F2",
   },
   {
-    key: "pinterest",
-    label: "Pinterest",
-    icon: "pinterest",
-    placeholder: "https://pinterest.com/username",
-    urlPattern: /pinterest\.com\//i,
+    id: "linkedin",
+    label: "LinkedIn",
+    icon: Link,
+    baseUrl: "https://linkedin.com/in/",
+    placeholder: "username",
+    color: "#0A66C2",
   },
   {
-    key: "snapchat",
-    label: "Snapchat",
-    icon: "snapchat",
-    placeholder: "https://snapchat.com/add/username",
-    urlPattern: /snapchat\.com\//i,
-  },
-  {
-    key: "twitch",
-    label: "Twitch",
-    icon: "twitch",
-    placeholder: "https://twitch.tv/username",
-    urlPattern: /twitch\.tv\//i,
-  },
-  {
-    key: "discord",
-    label: "Discord",
-    icon: "discord",
-    placeholder: "https://discord.gg/invite",
-    urlPattern: /discord\.(gg|com)\//i,
-  },
-  {
-    key: "substack",
-    label: "Substack",
-    icon: "substack",
-    placeholder: "https://yourname.substack.com",
-    urlPattern: /substack\.com/i,
-  },
-  {
-    key: "medium",
-    label: "Medium",
-    icon: "medium",
-    placeholder: "https://medium.com/@username",
-    urlPattern: /medium\.com\//i,
-  },
-  {
-    key: "patreon",
-    label: "Patreon",
-    icon: "patreon",
-    placeholder: "https://patreon.com/username",
-    urlPattern: /patreon\.com\//i,
-  },
-  {
-    key: "spotify",
-    label: "Spotify",
-    icon: "spotify",
-    placeholder: "https://open.spotify.com/artist/...",
-    urlPattern: /spotify\.com\//i,
-  },
-  {
-    key: "soundcloud",
-    label: "SoundCloud",
-    icon: "soundcloud",
-    placeholder: "https://soundcloud.com/username",
-    urlPattern: /soundcloud\.com\//i,
-  },
-  {
-    key: "beehiiv",
-    label: "Beehiiv",
-    icon: "beehiiv",
-    placeholder: "https://yourname.beehiiv.com",
-    urlPattern: /beehiiv\.com/i,
-  },
-  {
-    key: "email",
-    label: "Email",
-    icon: "mail",
-    placeholder: "hello@example.com",
-    isEmail: true,
-  },
-  {
-    key: "phone",
-    label: "Phone",
-    icon: "phone",
-    placeholder: "+1 (555) 000-0000",
-    isPhone: true,
-  },
-  {
-    key: "website",
-    label: "Website",
-    icon: "globe",
-    placeholder: "https://yourwebsite.com",
-  },
-  {
-    key: "whatsapp",
-    label: "WhatsApp",
-    icon: "whatsapp",
-    placeholder: "https://wa.me/15550000000",
-    urlPattern: /wa\.me\//i,
-  },
-  {
-    key: "telegram",
-    label: "Telegram",
-    icon: "send",
-    placeholder: "https://t.me/username",
-    urlPattern: /t\.me\//i,
-  },
-  {
-    key: "threads",
+    id: "threads",
     label: "Threads",
-    icon: "at-sign",
-    placeholder: "https://threads.net/@username",
-    urlPattern: /threads\.net\//i,
+    icon: Hash,
+    baseUrl: "https://threads.net/@",
+    placeholder: "username",
+    color: "#000000",
+    prefixHandle: true,
   },
   {
-    key: "bluesky",
-    label: "Bluesky",
-    icon: "cloud",
-    placeholder: "https://bsky.app/profile/username",
-    urlPattern: /bsky\.app\//i,
+    id: "pinterest",
+    label: "Pinterest",
+    icon: Globe,
+    baseUrl: "https://pinterest.com/",
+    placeholder: "username",
+    color: "#E60023",
+  },
+  {
+    id: "snapchat",
+    label: "Snapchat",
+    icon: MessageCircle,
+    baseUrl: "https://snapchat.com/add/",
+    placeholder: "username",
+    color: "#FFFC00",
+  },
+  {
+    id: "discord",
+    label: "Discord",
+    icon: MessageCircle,
+    baseUrl: "https://discord.gg/",
+    placeholder: "invite code or server",
+    color: "#5865F2",
+  },
+  {
+    id: "twitch",
+    label: "Twitch",
+    icon: Music2,
+    baseUrl: "https://twitch.tv/",
+    placeholder: "username",
+    color: "#9146FF",
+  },
+  {
+    id: "spotify",
+    label: "Spotify",
+    icon: Music,
+    baseUrl: "https://open.spotify.com/user/",
+    placeholder: "profile URL",
+    color: "#1DB954",
+  },
+  {
+    id: "soundcloud",
+    label: "SoundCloud",
+    icon: Music,
+    baseUrl: "https://soundcloud.com/",
+    placeholder: "username",
+    color: "#FF5500",
+  },
+  {
+    id: "apple_music",
+    label: "Apple Music",
+    icon: Music,
+    placeholder: "profile or artist URL",
+    color: "#FC3C44",
+  },
+  {
+    id: "github",
+    label: "GitHub",
+    icon: Link,
+    baseUrl: "https://github.com/",
+    placeholder: "username",
+    color: "#181717",
+    prefixHandle: true,
+  },
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    icon: MessageCircle,
+    baseUrl: "https://wa.me/",
+    placeholder: "phone number with country code",
+    color: "#25D366",
+  },
+  {
+    id: "telegram",
+    label: "Telegram",
+    icon: MessageCircle,
+    baseUrl: "https://t.me/",
+    placeholder: "username",
+    color: "#26A5E4",
+    prefixHandle: true,
+  },
+  {
+    id: "email",
+    label: "Email",
+    icon: Mail,
+    baseUrl: "mailto:",
+    placeholder: "you@example.com",
+    color: "#EA4335",
+  },
+  {
+    id: "telephone",
+    label: "Phone",
+    icon: Phone,
+    baseUrl: "tel:",
+    placeholder: "+1 (555) 000-0000",
+    color: "#34A853",
+  },
+  {
+    id: "website",
+    label: "Website",
+    icon: Globe,
+    placeholder: "https://yoursite.com",
+    color: "#6366F1",
   },
 ];
 
-/** Lookup map for O(1) access by key. */
-export const SOCIAL_PROVIDER_MAP = new Map<string, SocialProvider>(
-  SOCIAL_PROVIDERS.map((p) => [p.key, p])
+export const SOCIAL_PROVIDER_MAP = new Map(
+  SOCIAL_PROVIDERS.map((p) => [p.id, p]),
 );
 
-export function getSocialProvider(key: string): SocialProvider | undefined {
-  return SOCIAL_PROVIDER_MAP.get(key);
+export function getSocialProvider(id: string): SocialProvider | undefined {
+  return SOCIAL_PROVIDER_MAP.get(id);
 }

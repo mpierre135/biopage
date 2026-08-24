@@ -1,25 +1,28 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, type TargetAndTransition } from "framer-motion";
 import { BlockRenderProps } from "@/lib/blocks/types";
 import { LinkConfig } from "./index";
 import { cn } from "@/lib/utils";
 import { ExternalLink } from "lucide-react";
 
-const animationVariants: Record<
-  NonNullable<LinkConfig["animation"]>,
-  { initial?: object; animate?: object; whileHover?: object; transition?: object }
-> = {
+interface AnimProps {
+  animate?: TargetAndTransition;
+  whileHover?: TargetAndTransition;
+  transition?: TargetAndTransition["transition"];
+}
+
+const animationVariants: Record<NonNullable<LinkConfig["animation"]>, AnimProps> = {
   none: {},
   pulse: {
-    animate: { scale: [1, 1.015, 1] },
-    transition: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+    animate: { scale: [1, 1.015, 1] } as TargetAndTransition,
+    transition: { duration: 2, repeat: Infinity, ease: "easeInOut" } as TargetAndTransition["transition"],
   },
   shake: {
     whileHover: {
       x: [-3, 3, -3, 3, 0],
       transition: { duration: 0.4 },
-    },
+    } as TargetAndTransition,
   },
 };
 
@@ -34,22 +37,28 @@ export function LinkRender({ config, blockId }: BlockRenderProps<LinkConfig>) {
 
   if (!title || !url) return null;
 
-  const animProps = animationVariants[animation] ?? {};
+  const { animate, whileHover, transition } = animationVariants[animation] ?? {};
 
-  const sharedProps = {
+  const sharedDataAttrs = {
     "data-block-id": blockId,
     "data-event": "LINK_CLICK",
+  } as const;
+
+  const sharedLinkProps = {
     href: url,
-    target: "_blank",
+    target: "_blank" as const,
     rel: "noopener noreferrer",
+    animate,
+    whileHover,
+    transition,
+    ...sharedDataAttrs,
   };
 
   if (style === "thumbnail" && thumbnail) {
     return (
       <motion.a
-        {...sharedProps}
-        {...animProps}
-        className="flex items-center gap-3 w-full rounded-xl border border-border bg-card hover:bg-accent transition-colors p-3 text-left group"
+        {...sharedLinkProps}
+        className="flex items-center gap-3 w-full min-h-11 cursor-pointer rounded-xl border border-border bg-card hover:bg-accent transition-colors duration-200 p-3 text-left group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -70,9 +79,8 @@ export function LinkRender({ config, blockId }: BlockRenderProps<LinkConfig>) {
   if (style === "hero" && thumbnail) {
     return (
       <motion.a
-        {...sharedProps}
-        {...animProps}
-        className="relative flex items-end w-full min-h-32 rounded-xl overflow-hidden group"
+        {...sharedLinkProps}
+        className="relative flex items-end w-full min-h-32 cursor-pointer rounded-xl overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -91,8 +99,7 @@ export function LinkRender({ config, blockId }: BlockRenderProps<LinkConfig>) {
   if (style === "featured") {
     return (
       <motion.a
-        {...sharedProps}
-        {...animProps}
+        {...sharedLinkProps}
         className={cn(
           "relative flex items-center justify-center w-full rounded-xl p-[2px]",
           "bg-gradient-to-r from-violet-500 via-pink-500 to-orange-400",
@@ -109,8 +116,7 @@ export function LinkRender({ config, blockId }: BlockRenderProps<LinkConfig>) {
   // standard (default)
   return (
     <motion.a
-      {...sharedProps}
-      {...animProps}
+      {...sharedLinkProps}
       className="flex items-center justify-center w-full rounded-xl border border-border bg-card hover:bg-accent text-card-foreground font-semibold text-sm px-4 py-3 transition-colors"
     >
       {thumbnail && (
