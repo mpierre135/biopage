@@ -3,12 +3,6 @@ import {
   Globe,
   Mail,
   Phone,
-  Github,
-  Youtube,
-  Instagram,
-  Facebook,
-  Linkedin,
-  Twitter,
   AtSign,
   Cloud,
   Send,
@@ -18,6 +12,10 @@ import {
   MessageCircle,
   Camera,
   Link2,
+  ExternalLink,
+  Play,
+  Video,
+  Rss,
 } from "lucide-react";
 import { BlockRenderer } from "@/components/blocks/block-renderer";
 import { brandConfig } from "@/lib/brand";
@@ -29,12 +27,12 @@ const SOCIAL_ICON_MAP: Record<string, React.ComponentType<{ className?: string }
   globe: Globe,
   mail: Mail,
   phone: Phone,
-  github: Github,
-  youtube: Youtube,
-  instagram: Instagram,
-  facebook: Facebook,
-  linkedin: Linkedin,
-  x: Twitter,
+  github: ExternalLink,
+  youtube: Play,
+  instagram: Camera,
+  facebook: Globe,
+  linkedin: Link2,
+  x: AtSign,
   "at-sign": AtSign,
   cloud: Cloud,
   send: Send,
@@ -43,10 +41,10 @@ const SOCIAL_ICON_MAP: Record<string, React.ComponentType<{ className?: string }
   substack: Bookmark,
   discord: MessageCircle,
   snapchat: Camera,
-  tiktok: Music,
+  tiktok: Video,
   pinterest: Bookmark,
   twitch: Headphones,
-  medium: Bookmark,
+  medium: Rss,
   patreon: Bookmark,
   beehiiv: Bookmark,
   whatsapp: MessageCircle,
@@ -166,7 +164,7 @@ export function ProfileView({
                 style={{ backgroundColor: `${primaryColor}20`, color: primaryColor }}
                 aria-label={provider?.label ?? social.provider}
               >
-                <SocialIcon iconKey={provider?.icon ?? "globe"} className="size-4" />
+                <SocialIcon iconKey={social.provider} className="size-4" />
               </a>
             );
           })}
