@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { ThemeConfig } from "./types";
 
 const RADIUS_MAP = {
@@ -20,7 +21,16 @@ export function themeToCssVars(
 
   if (background?.color) vars["--bh-bg"] = background.color;
   if (background?.gradient) vars["--bh-bg-gradient"] = background.gradient;
-  if (background?.imageUrl) vars["--bh-bg-image"] = `url(${background.imageUrl})`;
+  if (background?.imageUrl) {
+    vars["--bh-bg-image"] = `url(${JSON.stringify(background.imageUrl)})`;
+  }
+  if (background?.imageSize) vars["--bh-bg-size"] = background.imageSize;
+  if (background?.imagePosition) {
+    vars["--bh-bg-position"] = background.imagePosition;
+  }
+  if (background?.imageAttachment) {
+    vars["--bh-bg-attachment"] = background.imageAttachment;
+  }
   if (background?.overlayColor) vars["--bh-bg-overlay"] = background.overlayColor;
   if (background?.overlayOpacity != null) {
     vars["--bh-bg-overlay-opacity"] = String(background.overlayOpacity);
@@ -77,6 +87,53 @@ export function themeToCssVars(
 
 export function cssVarsToStyle(
   vars: Record<string, string>,
-): React.CSSProperties {
-  return vars as React.CSSProperties;
+): CSSProperties {
+  return vars as CSSProperties;
+}
+
+/**
+ * Builds the page shell background from ThemeConfig (color, gradient, or image).
+ */
+export function buildPageBackgroundStyle(
+  config: ThemeConfig = {},
+): CSSProperties {
+  const bg = config.background ?? {};
+  const style: CSSProperties = {
+    color: config.colors?.text ?? "#1e293b",
+    fontFamily: config.typography?.family ?? "inherit",
+  };
+
+  if (bg.imageUrl) {
+    style.backgroundColor = bg.color ?? "#0f172a";
+    style.backgroundImage = `url(${JSON.stringify(bg.imageUrl)})`;
+    style.backgroundSize = bg.imageSize ?? "cover";
+    style.backgroundPosition = bg.imagePosition ?? "center";
+    style.backgroundRepeat = "no-repeat";
+    style.backgroundAttachment = bg.imageAttachment ?? "scroll";
+    return style;
+  }
+
+  if (bg.gradient) {
+    style.background = bg.gradient;
+    return style;
+  }
+
+  style.background = bg.color ?? "#ffffff";
+  return style;
+}
+
+export function hasBackgroundOverlay(config: ThemeConfig = {}): boolean {
+  const opacity = config.background?.overlayOpacity ?? 0;
+  return Boolean(config.background?.imageUrl && opacity > 0);
+}
+
+export function backgroundOverlayStyle(
+  config: ThemeConfig = {},
+): CSSProperties | null {
+  if (!hasBackgroundOverlay(config)) return null;
+  const bg = config.background!;
+  return {
+    backgroundColor: bg.overlayColor ?? "#000000",
+    opacity: bg.overlayOpacity ?? 0.35,
+  };
 }

@@ -31,6 +31,7 @@ export function ThemePicker({
     startTransition(async () => {
       const result = await updateProfile(profileId, {
         designConfig: { ...preset.config, slug: preset.slug },
+        themeId: null,
       });
       if (!result.success) {
         toast.error(result.error ?? "Could not apply theme");

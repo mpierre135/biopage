@@ -10,7 +10,7 @@ import {
   experiments,
   experimentVariants,
 } from "@/lib/db/schema";
-import { themeToCssVars, cssVarsToStyle } from "@/lib/themes/resolver";
+import { themeToCssVars, cssVarsToStyle, buildPageBackgroundStyle, backgroundOverlayStyle } from "@/lib/themes/resolver";
 import { brandConfig } from "@/lib/brand";
 import { ProfileView } from "@/components/public/profile-view";
 import { AnalyticsBeacon } from "@/components/public/analytics-beacon";
@@ -162,10 +162,11 @@ export default async function UsernamePage({ params }: Props) {
     (profile.designConfig as ThemeConfig) ??
     {};
   const cssVars = themeToCssVars(themeConfig);
-  const style = cssVarsToStyle(cssVars);
-
-  const bgColor = themeConfig.background?.color ?? "#ffffff";
-  const bgGradient = themeConfig.background?.gradient;
+  const style = {
+    ...cssVarsToStyle(cssVars),
+    ...buildPageBackgroundStyle(themeConfig),
+  };
+  const overlay = backgroundOverlayStyle(themeConfig);
 
   const pixels: TrackingPixel[] = pixelRows
     .filter((r) => PIXEL_PROVIDERS.has(r.provider))
@@ -178,36 +179,37 @@ export default async function UsernamePage({ params }: Props) {
     .filter((p) => p.pixelId.length > 0);
 
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        ...style,
-        background: bgGradient ?? bgColor,
-        color: themeConfig.colors?.text ?? "#1e293b",
-        fontFamily: themeConfig.typography?.family ?? "inherit",
-      }}
-    >
-      <ProfileView
-        profile={{
-          id: profile.id,
-          username: profile.username,
-          displayName: profile.displayName,
-          bio: profile.bio,
-          profileImage: profile.profileImage,
-          showBranding: profile.showBranding,
-        }}
-        blocks={visibleBlocks.map((b) => ({
-          id: b.id,
-          type: b.type,
-          config: b.config as Record<string, unknown>,
-        }))}
-        socials={profileSocials.map((s) => ({
-          id: s.id,
-          provider: s.provider,
-          url: s.url,
-        }))}
-        themeConfig={themeConfig}
-      />
+    <div className="relative min-h-screen" style={style}>
+      {overlay ? (
+        <div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={overlay}
+          aria-hidden
+        />
+      ) : null}
+      <div className="relative z-10">
+        <ProfileView
+          profile={{
+            id: profile.id,
+            username: profile.username,
+            displayName: profile.displayName,
+            bio: profile.bio,
+            profileImage: profile.profileImage,
+            showBranding: profile.showBranding,
+          }}
+          blocks={visibleBlocks.map((b) => ({
+            id: b.id,
+            type: b.type,
+            config: b.config as Record<string, unknown>,
+          }))}
+          socials={profileSocials.map((s) => ({
+            id: s.id,
+            provider: s.provider,
+            url: s.url,
+          }))}
+          themeConfig={themeConfig}
+        />
+      </div>
       <AnalyticsBeacon profileId={profile.id} />
       <TrackingPixels pixels={pixels} />
     </div>
