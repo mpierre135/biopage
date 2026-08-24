@@ -56,6 +56,11 @@ Redirect URLs to allowlist on each developer app:
 - `https://YOUR_DOMAIN/api/integrations/spotify/callback`
 - `https://YOUR_DOMAIN/api/integrations/meta/callback`
 
+Platform apps already created for this repo:
+
+- Shopify Dev Dashboard: org `98541073`, app `414698831873` ([settings](https://dev.shopify.com/dashboard/98541073/apps/414698831873/settings)). Redirects include production (`biopage-rudy-pierres-projects.vercel.app`, `biopage-seven.vercel.app`) and local (`http://localhost:3000` / `3002`) callbacks. Scope: `read_products`.
+- Meta Developer app: **BioHub** `944004617992154` ([dashboard](https://developers.facebook.com/apps/944004617992154/)). Add Valid OAuth Redirect URIs for `/api/integrations/meta/callback` on those same hosts, then put `META_APP_SECRET` in `.env.local` and Vercel.
+
 | Variable | Description |
 |---|---|
 | `SHOPIFY_CLIENT_ID` | Shopify custom app client ID (per-store OAuth) |
