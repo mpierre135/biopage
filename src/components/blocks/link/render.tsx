@@ -101,12 +101,13 @@ export function LinkRender({ config, blockId }: BlockRenderProps<LinkConfig>) {
       <motion.a
         {...sharedLinkProps}
         className={cn(
-          "relative flex items-center justify-center w-full rounded-xl p-[2px]",
+          "relative flex items-center justify-center w-full min-h-11 cursor-pointer rounded-xl p-[2px]",
           "bg-gradient-to-r from-violet-500 via-pink-500 to-orange-400",
-          "hover:shadow-lg hover:shadow-pink-500/25 transition-shadow",
+          "hover:shadow-lg hover:shadow-pink-500/25 transition-shadow duration-200",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         )}
       >
-        <span className="flex items-center justify-center w-full px-4 py-3 rounded-[10px] bg-card text-card-foreground font-semibold text-sm">
+        <span className="flex items-center justify-center w-full min-h-11 px-4 py-3 rounded-[10px] bg-card text-card-foreground font-semibold text-sm">
           {title}
         </span>
       </motion.a>
@@ -117,7 +118,7 @@ export function LinkRender({ config, blockId }: BlockRenderProps<LinkConfig>) {
   return (
     <motion.a
       {...sharedLinkProps}
-      className="flex items-center justify-center w-full rounded-xl border border-border bg-card hover:bg-accent text-card-foreground font-semibold text-sm px-4 py-3 transition-colors"
+      className="flex items-center justify-center w-full min-h-11 cursor-pointer rounded-xl border border-border bg-card hover:bg-accent text-card-foreground font-semibold text-sm px-4 py-3 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {thumbnail && (
         // eslint-disable-next-line @next/next/no-img-element
