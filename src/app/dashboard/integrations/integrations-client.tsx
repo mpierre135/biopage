@@ -263,7 +263,7 @@ export function IntegrationsClient({
             {platform.spotify ? (
               <Button
                 className="min-h-11 cursor-pointer gap-2"
-                render={<a href="/api/integrations/spotify/start" />}
+                render={<Link href="/api/integrations/spotify/start" />}
               >
                 <Plug className="size-4" />
                 Connect Spotify
@@ -313,7 +313,7 @@ export function IntegrationsClient({
             {platform.meta ? (
               <Button
                 className="min-h-11 cursor-pointer gap-2"
-                render={<a href="/api/integrations/meta/start" />}
+                render={<Link href="/api/integrations/meta/start" />}
               >
                 <Plug className="size-4" />
                 Connect Facebook

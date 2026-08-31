@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { randomInt } from "node:crypto";
 import { eq, asc, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -143,7 +144,7 @@ export default async function UsernamePage({ params }: Props) {
       .from(experimentVariants)
       .where(eq(experimentVariants.experimentId, runningExp.id));
     if (variants.length > 0) {
-      const pick = variants[Math.floor(Math.random() * variants.length)];
+      const pick = variants[randomInt(variants.length)];
       await db
         .update(experimentVariants)
         .set({ impressions: sql`${experimentVariants.impressions} + 1` })

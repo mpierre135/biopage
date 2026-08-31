@@ -16,11 +16,17 @@ export type OauthState = {
 };
 
 function signingKey(): string {
-  return (
+  const key = (
     process.env.CLERK_SECRET_KEY ??
     process.env.INTEGRATION_STATE_SECRET ??
     "biohub-dev-oauth-state"
   );
+  if (process.env.NODE_ENV === "production" && key === "biohub-dev-oauth-state") {
+    throw new Error(
+      "OAuth state signing is not configured. Set CLERK_SECRET_KEY or INTEGRATION_STATE_SECRET.",
+    );
+  }
+  return key;
 }
 
 function sign(payload: string): string {
@@ -46,7 +52,14 @@ export function decodeOauthState(raw: string | undefined): OauthState | null {
     const parsed = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8"),
     ) as OauthState;
-    if (!parsed.clerkUserId || !parsed.provider || !parsed.exp) return null;
+    if (
+      !parsed.clerkUserId ||
+      !["shopify", "spotify", "meta"].includes(parsed.provider) ||
+      !parsed.nonce ||
+      !parsed.exp
+    ) {
+      return null;
+    }
     if (Date.now() > parsed.exp) return null;
     return parsed;
   } catch {
@@ -322,11 +335,15 @@ async function exchangeMeta(code: string): Promise<TokenResult> {
     throw new Error("Meta did not return an access token.");
   }
 
+  const graphVersion = process.env.META_API_VERSION ?? "v21.0";
+  const appsecretProof = createHmac("sha256", appSecret)
+    .update(tokenJson.access_token)
+    .digest("hex");
   let name = "Meta";
   let userId: string | undefined;
   try {
     const meRes = await fetch(
-      `https://graph.facebook.com/v21.0/me?fields=id,name&access_token=${encodeURIComponent(tokenJson.access_token)}`,
+      `https://graph.facebook.com/${graphVersion}/me?fields=id,name&access_token=${encodeURIComponent(tokenJson.access_token)}&appsecret_proof=${appsecretProof}`,
     );
     if (meRes.ok) {
       const me = (await meRes.json()) as { id?: string; name?: string };

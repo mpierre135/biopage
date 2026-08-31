@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { getUserByClerkId } from "@/lib/auth/users";
+import { canUseFeature } from "@/lib/billing/entitlements";
 import {
   getPlatformFlags,
   isOauthProvider,
@@ -30,6 +32,11 @@ export async function GET(
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.redirect(new URL("/sign-in", req.url));
+  }
+
+  const user = await getUserByClerkId(userId);
+  if (!user || !(await canUseFeature(user.id, "integrations"))) {
+    return dashboardError(req, "Upgrade to Pro to connect apps.");
   }
 
   const flags = getPlatformFlags();

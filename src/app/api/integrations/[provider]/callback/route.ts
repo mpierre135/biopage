@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { integrations, profiles } from "@/lib/db/schema";
 import { getUserByClerkId } from "@/lib/auth/users";
+import { canUseFeature } from "@/lib/billing/entitlements";
 import { isOauthProvider } from "@/lib/integrations/catalog";
 import {
   decodeOauthState,
@@ -42,11 +43,17 @@ export async function GET(
   }
 
   const code = req.nextUrl.searchParams.get("code");
-  const stateRaw =
-    req.nextUrl.searchParams.get("state") ??
-    req.cookies.get(oauthStateCookieName())?.value;
+  const stateRaw = req.nextUrl.searchParams.get("state");
+  const cookieState = req.cookies.get(oauthStateCookieName())?.value;
   const state = decodeOauthState(stateRaw ?? undefined);
-  if (!code || !state || state.provider !== raw) {
+  if (
+    !code ||
+    !stateRaw ||
+    !cookieState ||
+    stateRaw !== cookieState ||
+    !state ||
+    state.provider !== raw
+  ) {
     return redirectToIntegrations(req, {
       error: "This connection expired. Try again.",
     });
@@ -56,11 +63,16 @@ export async function GET(
   const shop = state.shop ?? shopFromQuery ?? undefined;
 
   try {
-    const exchanged = await exchangeOauthCode(raw, code, shop);
     const user = await getUserByClerkId(state.clerkUserId);
     if (!user) {
       return redirectToIntegrations(req, {
         error: "Sign in again, then reconnect.",
+      });
+    }
+
+    if (!(await canUseFeature(user.id, "integrations"))) {
+      return redirectToIntegrations(req, {
+        error: "Upgrade to Pro to connect apps.",
       });
     }
 
@@ -74,6 +86,8 @@ export async function GET(
         error: "Finish onboarding first.",
       });
     }
+
+    const exchanged = await exchangeOauthCode(raw, code, shop);
 
     const [prev] = await db
       .select()

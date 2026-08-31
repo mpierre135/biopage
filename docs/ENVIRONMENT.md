@@ -69,5 +69,7 @@ Platform apps already created for this repo:
 | `SPOTIFY_CLIENT_SECRET` | Spotify developer app secret |
 | `META_APP_ID` | Meta (Facebook) app ID for optional ad-account login |
 | `META_APP_SECRET` | Meta app secret |
+| `META_API_VERSION` | Meta Graph API version (defaults to `v21.0`) |
+| `INTEGRATION_STATE_SECRET` | Dedicated OAuth state signing secret; optional when `CLERK_SECRET_KEY` is set |
 
 Pixels (Meta / Google / TikTok) do **not** need these. They use a pixel ID pasted in **Dashboard → Pixels**. Facebook and Instagram ads share the same Meta Pixel.
