@@ -140,6 +140,7 @@ export const profiles = pgTable(
     designConfig: jsonb("design_config").$type<Record<string, unknown>>().default({}),
     socialIconPosition: varchar("social_icon_position", { length: 16 }).default("bottom"),
     showBranding: boolean("show_branding").default(true).notNull(),
+    showFollowerTotal: boolean("show_follower_total").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -188,6 +189,24 @@ export const themes = pgTable("themes", {
     .notNull(),
 });
 
+export const collections = pgTable(
+  "collections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 160 }).notNull(),
+    position: integer("position").notNull().default(0),
+    enabled: boolean("enabled").default(true).notNull(),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow().notNull().$onUpdate(() => new Date()),
+  },
+  (t) => [index("collections_profile_position_idx").on(t.profileId, t.position)],
+);
+
 export const blocks = pgTable(
   "blocks",
   {
@@ -195,6 +214,9 @@ export const blocks = pgTable(
     profileId: uuid("profile_id")
       .notNull()
       .references(() => profiles.id, { onDelete: "cascade" }),
+    collectionId: uuid("collection_id").references(() => collections.id, {
+      onDelete: "set null",
+    }),
     type: blockTypeEnum("type").notNull(),
     position: integer("position").notNull().default(0),
     enabled: boolean("enabled").default(true).notNull(),
@@ -202,6 +224,7 @@ export const blocks = pgTable(
     publishAt: timestamp("publish_at", { withTimezone: true }),
     expireAt: timestamp("expire_at", { withTimezone: true }),
     timezone: varchar("timezone", { length: 64 }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -226,11 +249,30 @@ export const socialLinks = pgTable(
     url: text("url").notNull(),
     position: integer("position").notNull().default(0),
     enabled: boolean("enabled").default(true).notNull(),
+    followerCount: integer("follower_count"),
+    followerSource: varchar("follower_source", { length: 16 }),
+    followerSyncedAt: timestamp("follower_synced_at", { withTimezone: true }),
+    followerSyncStatus: varchar("follower_sync_status", { length: 16 })
+      .default("manual")
+      .notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (t) => [index("social_links_profile_idx").on(t.profileId)],
+);
+
+export const dismissedSuggestions = pgTable(
+  "dismissed_suggestions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    ruleKey: varchar("rule_key", { length: 80 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("dismissed_suggestions_profile_rule_uidx").on(t.profileId, t.ruleKey)],
 );
 
 export const linkRoutingRules = pgTable(

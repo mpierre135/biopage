@@ -1,412 +1,110 @@
 "use client";
+/* eslint-disable @next/next/no-img-element -- creator-provided profile URLs are not restricted to configured image hosts */
 
-import { useState, useTransition } from "react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-  arrayMove,
-} from "@dnd-kit/sortable";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  Plus,
-  GripVertical,
-  Trash2,
-  Loader2,
-  Smartphone,
-  Link as LinkIcon,
-} from "lucide-react";
+import { Archive, BarChart3, ChevronRight, Edit3, ExternalLink, FolderPlus, GripVertical, ImageIcon, Inbox, Link as LinkIcon, Loader2, Plus, RefreshCw, Share2, Smartphone, Sparkles, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { BlockRenderer } from "@/components/blocks/block-renderer";
+import { Textarea } from "@/components/ui/textarea";
 import { BlockEditor } from "@/components/blocks/block-editor";
+import { ProfileView } from "@/components/public/profile-view";
 import { getBlock, listBlocks } from "@/lib/blocks";
-import {
-  createBlock,
-  updateBlock,
-  deleteBlock,
-  reorderBlocks,
-} from "@/lib/actions/blocks";
+import { createBlock, deleteBlock, updateBlock } from "@/lib/actions/blocks";
+import { updateProfile } from "@/lib/actions/profile";
+import { archiveEditorItem, createCollection, deleteCollection, deleteSocialLink, dismissSuggestion, refreshFollowerCount, reorderEditorItems, saveSocialLink, setBlockCollection, updateCollection } from "@/lib/actions/editor";
+import { buildPageBackgroundStyle } from "@/lib/themes/resolver";
 import { cn } from "@/lib/utils";
 import type { BlockType } from "@/lib/blocks";
+import type { ThemeConfig } from "@/lib/themes/types";
+import { getEditorSuggestions, isFollowerDataStale } from "@/lib/editor/rules";
 
-import "@/lib/blocks";
+type BlockItem = { id: string; type: BlockType; position: number; enabled: boolean; config: Record<string, unknown>; collectionId: string | null; clicks: number };
+type CollectionItem = { id: string; title: string; position: number; enabled: boolean; archivedAt: null };
+type SocialItem = { id: string; provider: string; url: string; position: number; enabled: boolean; followerCount: number | null; followerSource: string | null; followerSyncedAt: string | null; followerSyncStatus: string };
+type ProfileDraft = { displayName: string; bio: string; profileImage: string; showBranding: boolean; showFollowerTotal: boolean };
+type ArchiveItem = { kind: "block" | "collection"; id: string; label: string };
+type TopItem = { kind: "block" | "collection"; id: string; position: number };
 
-type BlockItem = {
-  id: string;
-  type: BlockType;
-  position: number;
-  enabled: boolean;
-  config: Record<string, unknown>;
-};
-
-function SortableBlock({
-  block,
-  onToggle,
-  onDelete,
-  onEdit,
-}: {
-  block: BlockItem;
-  onToggle: () => void;
-  onDelete: () => void;
-  onEdit: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: block.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const descriptor = getBlock(block.type);
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "group flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-all duration-200",
-        isDragging && "opacity-50 shadow-lg",
-      )}
-    >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="cursor-grab touch-none text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-        aria-label="Drag to reorder"
-      >
-        <GripVertical className="h-5 w-5" />
-      </button>
-
-      <button
-        type="button"
-        onClick={onEdit}
-        className="flex-1 text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-      >
-        <div className="flex items-center gap-2">
-          {descriptor && <descriptor.icon className="h-4 w-4 text-muted-foreground" />}
-          <span className="text-sm font-medium text-foreground">
-            {descriptor?.label ?? block.type}
-          </span>
-        </div>
-        <p className="mt-0.5 text-xs text-muted-foreground truncate max-w-[200px]">
-          {(block.config as Record<string, string>).title ??
-            (block.config as Record<string, string>).url ??
-            (block.config as Record<string, string>).text ??
-            (block.config as Record<string, string>).headline ??
-            "Click to edit"}
-        </p>
-      </button>
-
-      <Switch
-        checked={block.enabled}
-        onCheckedChange={onToggle}
-        aria-label={block.enabled ? "Disable block" : "Enable block"}
-        className="cursor-pointer"
-      />
-
-      <button
-        type="button"
-        onClick={onDelete}
-        className="rounded p-1.5 text-muted-foreground transition-colors duration-200 hover:bg-destructive/10 hover:text-destructive cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label="Delete block"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
-    </div>
-  );
+function summary(block: BlockItem) {
+  const config = block.config as Record<string, string>;
+  return { title: config.title ?? config.headline ?? getBlock(block.type)?.label ?? block.type, detail: config.url ?? config.text ?? config.description ?? getBlock(block.type)?.description ?? "Click to edit" };
 }
 
-export function LinksEditor({
-  profileId,
-  username,
-  initialBlocks,
-}: {
-  profileId: string;
-  username: string;
-  initialBlocks: BlockItem[];
-}) {
-  const [items, setItems] = useState(initialBlocks);
-  const [isPending, startTransition] = useTransition();
-  const [addOpen, setAddOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draftConfig, setDraftConfig] = useState<Record<string, unknown>>({});
+function SortableShell({ id, children }: { id: string; children: (drag: { attributes: Omit<ReturnType<typeof useSortable>["attributes"], "aria-describedby">; listeners: ReturnType<typeof useSortable>["listeners"] }) => React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  // dnd-kit's generated description id is not stable across server/client renders.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { "aria-describedby": _describedBy, ...stableAttributes } = attributes;
+  return <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={cn(isDragging && "z-20 opacity-60")}>{children({ attributes: stableAttributes, listeners })}</div>;
+}
 
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+function ActionIcon({ label, children, onClick, danger = false }: { label: string; children: React.ReactNode; onClick: () => void; danger?: boolean }) {
+  return <button type="button" aria-label={label} title={label} onClick={(event) => { event.stopPropagation(); onClick(); }} className={cn("flex size-8 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8129ff]", danger && "hover:bg-red-50 hover:text-red-600")}>{children}</button>;
+}
 
-  const editing = items.find((i) => i.id === editingId) ?? null;
+function BlockCard({ block, collections, onEdit, onToggle, onArchive, onDelete, onMove }: { block: BlockItem; collections: CollectionItem[]; onEdit: () => void; onToggle: () => void; onArchive: () => void; onDelete: () => void; onMove: (collectionId: string | null) => void }) {
+  const descriptor = getBlock(block.type); const copy = summary(block);
+  return <div className="rounded-[22px] border border-[#e8e8ec] bg-white px-4 py-4 shadow-[0_2px_7px_rgba(24,24,27,0.04)]">
+    <div className="flex gap-3"><div className="pt-1 text-zinc-400"><GripVertical className="size-4" /></div><button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8129ff]"><div className="flex items-center gap-1.5 text-[13px] font-semibold text-zinc-900"><span className="truncate">{copy.title}</span><Edit3 className="size-3 shrink-0" /></div><p className="mt-1 truncate text-xs text-zinc-600">{copy.detail}</p></button><ActionIcon label="Share block" onClick={() => navigator.clipboard.writeText(String((block.config as Record<string, unknown>).url ?? location.href)).then(() => toast.success("Link copied"))}><Share2 className="size-3.5" /></ActionIcon><Switch checked={block.enabled} onCheckedChange={onToggle} aria-label={block.enabled ? "Disable block" : "Enable block"} className="data-[checked]:bg-[#22a447]" /></div>
+    <div className="mt-3 flex items-center gap-1 pl-7 text-zinc-500"><span className="mr-1 flex size-7 items-center justify-center rounded-md text-[#8129ff]">{descriptor ? <descriptor.icon className="size-4" /> : <LinkIcon className="size-4" />}</span><select value={block.collectionId ?? ""} onChange={(event) => onMove(event.target.value || null)} className="h-8 max-w-36 rounded-md border-0 bg-transparent px-1 text-[11px] text-zinc-500 outline-none" aria-label="Move to collection"><option value="">No collection</option>{collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.title}</option>)}</select><span className="ml-auto flex items-center gap-1 text-[11px]"><BarChart3 className="size-3.5" /> {block.clicks} {block.clicks === 1 ? "click" : "clicks"}</span><ActionIcon label="Archive block" onClick={onArchive}><Archive className="size-3.5" /></ActionIcon><ActionIcon label="Delete block" onClick={onDelete} danger><Trash2 className="size-3.5" /></ActionIcon></div>
+  </div>;
+}
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+function PreviewCanvas({ profile, blocks, collections, socials, username, themeConfig }: { profile: ProfileDraft; blocks: BlockItem[]; collections: CollectionItem[]; socials: SocialItem[]; username: string; themeConfig: ThemeConfig }) {
+  return <div className="relative h-[700px] w-[360px] max-w-full overflow-hidden rounded-[34px] border-[6px] border-zinc-900 bg-white shadow-2xl"><div className="h-full overflow-y-auto" style={buildPageBackgroundStyle(themeConfig)}><ProfileView profile={{ id: "preview", username, ...profile }} blocks={blocks.filter((block) => block.enabled)} collections={collections.filter((collection) => collection.enabled)} socials={socials.filter((social) => social.enabled)} themeConfig={themeConfig} preview /></div></div>;
+}
 
-    const oldIndex = items.findIndex((i) => i.id === active.id);
-    const newIndex = items.findIndex((i) => i.id === over.id);
-
-    const newItems = arrayMove(items, oldIndex, newIndex);
-    setItems(newItems);
-
+export function LinksEditor({ profileId, username, initialBlocks, initialProfile, initialSocials, initialCollections, archivedItems, dismissedSuggestions, connectedProviders, themeConfig }: { profileId: string; username: string; initialBlocks: BlockItem[]; initialProfile: ProfileDraft; initialSocials: SocialItem[]; initialCollections: CollectionItem[]; archivedItems: ArchiveItem[]; dismissedSuggestions: string[]; connectedProviders: string[]; themeConfig: ThemeConfig }) {
+  const [items, setItems] = useState(initialBlocks); const [collections, setCollections] = useState(initialCollections); const [profile, setProfile] = useState(initialProfile); const [socials, setSocials] = useState(initialSocials); const [archive, setArchive] = useState(archivedItems);
+  const [editingId, setEditingId] = useState<string | null>(null); const [draftConfig, setDraftConfig] = useState<Record<string, unknown>>({}); const [addOpen, setAddOpen] = useState(false); const [profileOpen, setProfileOpen] = useState(false); const [socialOpen, setSocialOpen] = useState(false); const [archiveOpen, setArchiveOpen] = useState(false); const [collectionName, setCollectionName] = useState(""); const [socialDraft, setSocialDraft] = useState({ provider: "instagram", url: "", followerCount: "" }); const [dismissed, setDismissed] = useState(dismissedSuggestions); const [isPending, beginTransition] = useTransition();
+  function startTransition(callback: () => unknown | Promise<unknown>) { beginTransition(async () => { await callback(); }); }
+  useEffect(() => {
+    const staleSpotify = socials.find((social) => social.provider === "spotify" && isFollowerDataStale(social.followerSyncedAt));
+    if (!staleSpotify) return;
     startTransition(async () => {
-      await reorderBlocks(
-        profileId,
-        newItems.map((i) => i.id),
-      );
-    });
-  }
-
-  function handleToggle(blockId: string) {
-    const block = items.find((i) => i.id === blockId);
-    if (!block) return;
-
-    setItems((prev) =>
-      prev.map((i) => (i.id === blockId ? { ...i, enabled: !i.enabled } : i)),
-    );
-
-    startTransition(async () => {
-      await updateBlock(blockId, { enabled: !block.enabled });
-    });
-  }
-
-  function handleDelete(blockId: string) {
-    setItems((prev) => prev.filter((i) => i.id !== blockId));
-    if (editingId === blockId) setEditingId(null);
-    startTransition(async () => {
-      await deleteBlock(blockId);
-    });
-  }
-
-  function handleAddBlock(type: BlockType) {
-    const descriptor = getBlock(type);
-    if (!descriptor) return;
-
-    setAddOpen(false);
-    startTransition(async () => {
-      const result = await createBlock(profileId, {
-        type,
-        enabled: true,
-        config: descriptor.defaultConfig as Record<string, unknown>,
-      });
-      if (result.success && result.blockId) {
-        const newBlock = {
-          id: result.blockId,
-          type,
-          position: items.length,
-          enabled: true,
-          config: descriptor.defaultConfig as Record<string, unknown>,
-        };
-        setItems((prev) => [...prev, newBlock]);
-        setEditingId(result.blockId);
-        setDraftConfig(newBlock.config);
-      } else if (result.error) {
-        toast.error(result.error);
-      }
-    });
-  }
-
-  function openEdit(block: BlockItem) {
-    setEditingId(block.id);
-    setDraftConfig(block.config);
-  }
-
-  function saveEdit() {
-    if (!editing) return;
-    setItems((prev) =>
-      prev.map((i) => (i.id === editing.id ? { ...i, config: draftConfig } : i)),
-    );
-    startTransition(async () => {
-      const result = await updateBlock(editing.id, { config: draftConfig });
+      const result = await refreshFollowerCount(profileId, staleSpotify.id);
       if (result.success) {
-        toast.success("Block saved");
-        setEditingId(null);
-      } else {
-        toast.error(result.error ?? "Failed to save");
+        setSocials((current) => current.map((social) => social.id === staleSpotify.id ? { ...social, followerCount: result.followerCount ?? social.followerCount, followerSource: "connected", followerSyncStatus: "success", followerSyncedAt: new Date().toISOString() } : social));
       }
     });
-  }
+    // Refresh once on mount when the server-provided cache is stale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
+  const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })); const editing = items.find((item) => item.id === editingId) ?? null; const availableBlocks = listBlocks({ readyOnly: true });
+  const topItems = useMemo<TopItem[]>(() => [...items.filter((item) => !item.collectionId).map((item) => ({ kind: "block", id: item.id, position: item.position } as const)), ...collections.map((collection) => ({ kind: "collection", id: collection.id, position: collection.position } as const))].sort((a, b) => a.position - b.position), [items, collections]);
+  const suggestions = useMemo(() => getEditorSuggestions({ hasBio: Boolean(profile.bio), hasProfileImage: Boolean(profile.profileImage), blockTypes: items.map((item) => item.type), collectionCount: collections.length, hasShopify: connectedProviders.includes("shopify"), dismissed }), [profile, dismissed, items, collections.length, connectedProviders]);
+  function run(action: () => Promise<{ success: boolean; error?: string }>, success?: string) { startTransition(async () => { const result = await action(); if (!result.success) toast.error(result.error ?? "Something went wrong"); else if (success) toast.success(success); }); }
+  function handleDragEnd(event: DragEndEvent) { if (!event.over || event.active.id === event.over.id) return; const oldIndex = topItems.findIndex((item) => `${item.kind}:${item.id}` === event.active.id); const newIndex = topItems.findIndex((item) => `${item.kind}:${item.id}` === event.over?.id); const next = arrayMove(topItems, oldIndex, newIndex).map((item, position) => ({ ...item, position })); setItems((current) => current.map((item) => ({ ...item, position: next.find((candidate) => candidate.kind === "block" && candidate.id === item.id)?.position ?? item.position }))); setCollections((current) => current.map((item) => ({ ...item, position: next.find((candidate) => candidate.kind === "collection" && candidate.id === item.id)?.position ?? item.position }))); run(() => reorderEditorItems(profileId, next)); }
+  function addBlock(type: BlockType) { const descriptor = getBlock(type); if (!descriptor) return; setAddOpen(false); startTransition(async () => { const result = await createBlock(profileId, { type, enabled: true, config: descriptor.defaultConfig as Record<string, unknown> }); if (!result.success || !result.blockId) { toast.error(result.error ?? "Could not add block"); return; } const block: BlockItem = { id: result.blockId, type, enabled: true, config: descriptor.defaultConfig as Record<string, unknown>, position: topItems.length, collectionId: null, clicks: 0 }; setItems((current) => [...current, block]); setEditingId(block.id); setDraftConfig(block.config); }); }
+  function addCollection() { startTransition(async () => { const result = await createCollection(profileId, collectionName || "New collection"); if (!result.success || !result.id) { toast.error(result.error ?? "Could not add collection"); return; } setCollections((current) => [...current, { id: result.id!, title: collectionName || "New collection", position: topItems.length, enabled: true, archivedAt: null }]); setCollectionName(""); setAddOpen(false); }); }
+  function saveSocial() { startTransition(async () => { const count = socialDraft.followerCount === "" ? null : Number(socialDraft.followerCount); const result = await saveSocialLink(profileId, { provider: socialDraft.provider, url: socialDraft.url, followerCount: count }); if (!result.success || !result.id) { toast.error(result.error ?? "Could not add social link"); return; } setSocials((current) => [...current, { id: result.id!, provider: socialDraft.provider, url: socialDraft.url, position: current.length, enabled: true, followerCount: count, followerSource: count == null ? null : "manual", followerSyncedAt: null, followerSyncStatus: "manual" }]); setSocialDraft({ provider: "instagram", url: "", followerCount: "" }); }); }
+  function removeBlock(block: BlockItem) { if (!window.confirm(`Permanently delete “${summary(block).title}”?`)) return; const snapshot = items; setItems((current) => current.filter((item) => item.id !== block.id)); startTransition(async () => { const result = await deleteBlock(block.id); if (!result.success) { setItems(snapshot); toast.error(result.error ?? "Delete failed"); } }); }
+  function card(block: BlockItem) { return <BlockCard block={block} collections={collections} onEdit={() => { setEditingId(block.id); setDraftConfig(block.config); }} onToggle={() => { setItems((current) => current.map((item) => item.id === block.id ? { ...item, enabled: !item.enabled } : item)); run(() => updateBlock(block.id, { enabled: !block.enabled })); }} onArchive={() => { setItems((current) => current.filter((item) => item.id !== block.id)); setArchive((current) => [...current, { kind: "block", id: block.id, label: summary(block).title }]); run(() => archiveEditorItem("block", block.id, true), "Archived"); }} onDelete={() => removeBlock(block)} onMove={(collectionId) => { setItems((current) => current.map((item) => item.id === block.id ? { ...item, collectionId } : item)); run(() => setBlockCollection(block.id, collectionId), collectionId ? "Moved to collection" : "Removed from collection"); }} />; }
 
-  const availableBlocks = listBlocks({ readyOnly: true });
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            {items.length} block{items.length !== 1 ? "s" : ""}
-          </p>
-          <Dialog open={addOpen} onOpenChange={setAddOpen}>
-            <DialogTrigger
-              render={
-                <Button size="sm" className="cursor-pointer min-h-11 gap-2" />
-              }
-            >
-              <Plus className="h-4 w-4" />
-              Add Block
-            </DialogTrigger>
-            <DialogContent className="max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Add a Block</DialogTitle>
-              </DialogHeader>
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                {availableBlocks.map((desc) => (
-                  <button
-                    key={desc.type}
-                    type="button"
-                    onClick={() => handleAddBlock(desc.type)}
-                    className="flex items-center gap-3 rounded-lg border border-border p-3 text-left transition-all duration-200 hover:border-primary/40 hover:bg-muted/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <desc.icon className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {desc.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground line-clamp-1">
-                        {desc.description}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {items.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <LinkIcon className="h-10 w-10 text-muted-foreground/40" />
-              <p className="mt-3 text-sm text-muted-foreground">
-                No blocks yet. Add your first link or content block.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext items={items} strategy={verticalListSortingStrategy}>
-            <div className="space-y-2">
-              {items.map((block) => (
-                <SortableBlock
-                  key={block.id}
-                  block={block}
-                  onToggle={() => handleToggle(block.id)}
-                  onDelete={() => handleDelete(block.id)}
-                  onEdit={() => openEdit(block)}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-
-        {isPending && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Saving...
-          </div>
-        )}
-      </div>
-
-      <div className="hidden lg:block">
-        <div className="sticky top-24">
-          <div className="flex items-center gap-2 pb-3">
-            <Smartphone className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Preview
-            </span>
-          </div>
-          <div className="mx-auto w-[280px] rounded-[2rem] border-4 border-slate-800 bg-white p-4 shadow-xl">
-            <div className="space-y-2">
-              {items
-                .filter((b) => b.enabled)
-                .map((b) => (
-                  <BlockRenderer
-                    key={b.id}
-                    type={b.type}
-                    config={b.config}
-                    blockId={b.id}
-                    profileUsername={username}
-                  />
-                ))}
-              {items.filter((b) => b.enabled).length === 0 && (
-                <p className="py-8 text-center text-xs text-muted-foreground">
-                  Your page preview will appear here
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Dialog
-        open={!!editing}
-        onOpenChange={(open) => {
-          if (!open) setEditingId(null);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              Edit {editing ? getBlock(editing.type)?.label ?? "block" : "block"}
-            </DialogTitle>
-          </DialogHeader>
-          {editing && (
-            <div className="space-y-4 pt-2">
-              <BlockEditor
-                type={editing.type}
-                config={draftConfig}
-                onChange={setDraftConfig}
-              />
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  className="min-h-11 cursor-pointer"
-                  onClick={() => setEditingId(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="min-h-11 cursor-pointer"
-                  onClick={saveEdit}
-                  disabled={isPending}
-                >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Save"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
+  return <div className="mx-auto grid max-w-[1120px] gap-8 xl:grid-cols-[minmax(0,620px)_380px]">
+    <section className="min-w-0 rounded-[30px] bg-[#fafafb] p-4 sm:p-6">
+      <div className="flex items-start gap-4"><button type="button" onClick={() => setProfileOpen(true)} className="flex size-16 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-white shadow-sm focus-visible:ring-2 focus-visible:ring-[#8129ff]">{profile.profileImage ? <img src={profile.profileImage} alt="" className="size-full object-cover" /> : <ImageIcon className="m-auto size-5 text-zinc-400" />}</button><button type="button" onClick={() => setProfileOpen(true)} className="min-w-0 flex-1 text-left"><span className="flex items-center gap-1 text-sm font-semibold text-zinc-950">{profile.displayName}<Edit3 className="size-3" /></span><span className="mt-1 block line-clamp-2 text-xs text-zinc-500">{profile.bio || "Add bio"}</span></button><ActionIcon label="Share profile" onClick={() => navigator.clipboard.writeText(`${location.origin}/${username}`).then(() => toast.success("Profile link copied"))}><Share2 className="size-4" /></ActionIcon></div>
+      <div className="mt-3 flex flex-wrap items-center gap-2 pl-20">{socials.map((social) => <span key={social.id} className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 shadow-sm">{social.provider}</span>)}<button type="button" onClick={() => setSocialOpen(true)} className="rounded-full border border-dashed border-zinc-300 px-2.5 py-1 text-[11px] text-zinc-600 hover:border-[#8129ff]">Edit socials</button></div>
+      <label className="mt-3 ml-20 flex w-fit items-center gap-2 rounded-full border border-dashed border-zinc-300 bg-white px-3 py-1.5 text-[11px] text-zinc-600"><Users className="size-3.5" /> Show total followers <Switch checked={profile.showFollowerTotal} onCheckedChange={(value) => { setProfile((current) => ({ ...current, showFollowerTotal: value })); run(() => updateProfile(profileId, { showFollowerTotal: value })); }} className="scale-75 data-[checked]:bg-[#22a447]" /></label>
+      <Dialog open={addOpen} onOpenChange={setAddOpen}><DialogTrigger render={<Button className="mt-5 min-h-12 w-full rounded-full bg-[#8129ff] text-white hover:bg-[#701dea]" />}><Plus className="size-5" /> Add</DialogTrigger><DialogContent className="max-h-[84vh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Add to your page</DialogTitle></DialogHeader><div className="rounded-2xl border p-3"><Label htmlFor="collection-title">New collection</Label><div className="mt-2 flex gap-2"><Input id="collection-title" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="Collection title" /><Button variant="outline" onClick={addCollection}><FolderPlus className="size-4" /> Add</Button></div></div><div className="grid grid-cols-2 gap-2 pt-2">{availableBlocks.map((descriptor) => <button key={descriptor.type} type="button" onClick={() => addBlock(descriptor.type)} className="flex min-h-16 items-center gap-3 rounded-xl border border-zinc-200 p-3 text-left hover:border-[#8129ff] hover:bg-violet-50"><descriptor.icon className="size-5 text-[#8129ff]" /><span><b className="block text-sm">{descriptor.label}</b><small className="line-clamp-1 text-zinc-500">{descriptor.description}</small></span></button>)}</div></DialogContent></Dialog>
+      <div className="mt-4 flex items-center justify-between"><Button variant="outline" className="rounded-full" onClick={() => setAddOpen(true)}><FolderPlus className="size-4" /> Add collection</Button><Button variant="ghost" onClick={() => setArchiveOpen(true)}><Inbox className="size-4" /> View archive <ChevronRight className="size-4" /></Button></div>
+      {suggestions[0] && <div className="mt-4 rounded-[20px] border border-dashed border-fuchsia-400 bg-white p-3"><div className="flex items-center gap-2 text-xs font-semibold text-fuchsia-600"><span className="flex size-7 items-center justify-center rounded-full bg-fuchsia-500 text-white"><Sparkles className="size-3.5" /></span> We found ways to improve your page <button className="ml-auto" aria-label="Dismiss suggestion" onClick={() => { const key = suggestions[0].key; setDismissed((current) => [...current, key]); run(() => dismissSuggestion(profileId, key)); }}><X className="size-4" /></button></div><div className="mt-3 flex items-center gap-3 rounded-xl border bg-[#fafafb] p-3"><Sparkles className="size-5 text-[#8129ff]" /><div className="min-w-0 flex-1"><p className="text-xs font-semibold">{suggestions[0].title}</p><p className="text-[11px] text-zinc-500">{suggestions[0].body}</p></div><Button size="sm" className="rounded-full bg-zinc-950" onClick={() => suggestions[0].key === "complete-profile" ? setProfileOpen(true) : setAddOpen(true)}>{suggestions[0].action}</Button></div></div>}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}><SortableContext items={topItems.map((item) => `${item.kind}:${item.id}`)} strategy={verticalListSortingStrategy}><div className="mt-4 space-y-4">{topItems.map((top) => top.kind === "block" ? <SortableShell key={`block:${top.id}`} id={`block:${top.id}`}>{({ attributes, listeners }) => <div {...attributes} {...listeners}>{card(items.find((item) => item.id === top.id)!)}</div>}</SortableShell> : (() => { const collection = collections.find((item) => item.id === top.id)!; const members = items.filter((item) => item.collectionId === collection.id); return <SortableShell key={`collection:${top.id}`} id={`collection:${top.id}`}>{({ attributes, listeners }) => <div className="rounded-[22px] border border-[#e8e8ec] bg-white p-3 shadow-sm"><div className="flex items-center gap-2 px-1 py-1"><button type="button" {...attributes} {...listeners} aria-label="Reorder collection"><GripVertical className="size-4 text-zinc-400" /></button><Input className="h-9 flex-1 border-0 bg-transparent px-1 font-semibold" value={collection.title} onChange={(event) => setCollections((current) => current.map((item) => item.id === collection.id ? { ...item, title: event.target.value } : item))} onBlur={() => run(() => updateCollection(collection.id, { title: collection.title }))} /><Switch checked={collection.enabled} onCheckedChange={(enabled) => { setCollections((current) => current.map((item) => item.id === collection.id ? { ...item, enabled } : item)); run(() => updateCollection(collection.id, { enabled })); }} className="data-[checked]:bg-[#22a447]" /><ActionIcon label="Archive collection" onClick={() => { setCollections((current) => current.filter((item) => item.id !== collection.id)); setArchive((current) => [...current, { kind: "collection", id: collection.id, label: collection.title }]); run(() => archiveEditorItem("collection", collection.id, true), "Archived"); }}><Archive className="size-3.5" /></ActionIcon></div><div className="mt-2 space-y-3">{members.length ? members.map((block) => <div key={block.id}>{card(block)}</div>) : <p className="rounded-xl border border-dashed py-6 text-center text-xs text-zinc-400">Move blocks here using their collection menu.</p>}</div></div>}</SortableShell>; })())}</div></SortableContext></DndContext>
+      {isPending && <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500"><Loader2 className="size-3 animate-spin" /> Saving changes…</div>}
+      <div className="mt-5 xl:hidden"><Sheet><SheetTrigger render={<Button variant="outline" className="w-full rounded-full" />}><Smartphone className="size-4" /> Open live preview</SheetTrigger><SheetContent side="right" className="w-full overflow-y-auto bg-zinc-100 p-4 sm:max-w-[430px]"><SheetTitle className="mb-4">Live preview</SheetTitle><PreviewCanvas profile={profile} blocks={items} collections={collections} socials={socials} username={username} themeConfig={themeConfig} /></SheetContent></Sheet></div>
+    </section>
+    <aside className="hidden xl:block"><div className="sticky top-8"><div className="mb-3 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-semibold text-zinc-700"><Smartphone className="size-4" /> Live preview</span><a href={`/${username}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-zinc-500 hover:text-[#8129ff]">Open page <ExternalLink className="size-3" /></a></div><PreviewCanvas profile={profile} blocks={items} collections={collections} socials={socials} username={username} themeConfig={themeConfig} /></div></aside>
+    <Dialog open={!!editing} onOpenChange={(open) => !open && setEditingId(null)}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>Edit {editing ? getBlock(editing.type)?.label ?? "block" : "block"}</DialogTitle></DialogHeader>{editing && <div className="space-y-4"><BlockEditor type={editing.type} config={draftConfig} onChange={setDraftConfig} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEditingId(null)}>Cancel</Button><Button className="bg-[#8129ff]" onClick={() => { const id = editing.id; setItems((current) => current.map((item) => item.id === id ? { ...item, config: draftConfig } : item)); setEditingId(null); run(() => updateBlock(id, { config: draftConfig }), "Block saved"); }}>Save changes</Button></div></div>}</DialogContent></Dialog>
+    <Dialog open={profileOpen} onOpenChange={setProfileOpen}><DialogContent><DialogHeader><DialogTitle>Edit profile</DialogTitle></DialogHeader><div className="space-y-4"><div><Label>Display name</Label><Input value={profile.displayName} onChange={(event) => setProfile((current) => ({ ...current, displayName: event.target.value }))} /></div><div><Label>Bio</Label><Textarea value={profile.bio} onChange={(event) => setProfile((current) => ({ ...current, bio: event.target.value }))} /></div><div><Label>Profile image URL</Label><Input value={profile.profileImage} onChange={(event) => setProfile((current) => ({ ...current, profileImage: event.target.value }))} /></div><Button className="w-full bg-[#8129ff]" onClick={() => { setProfileOpen(false); run(() => updateProfile(profileId, profile), "Profile saved"); }}>Save profile</Button></div></DialogContent></Dialog>
+    <Dialog open={socialOpen} onOpenChange={setSocialOpen}><DialogContent><DialogHeader><DialogTitle>Social links and followers</DialogTitle></DialogHeader><div className="space-y-3">{socials.map((social) => <div key={social.id} className="flex items-center gap-2 rounded-xl border p-3"><div className="min-w-0 flex-1"><p className="text-sm font-semibold capitalize">{social.provider}</p><p className="truncate text-xs text-zinc-500">{social.url}</p><p className="text-[11px] text-zinc-400">{social.followerCount == null ? "Follower count not set" : `${social.followerCount.toLocaleString()} followers · ${social.followerSource ?? "manual"}`}</p></div>{social.provider === "spotify" && <ActionIcon label="Refresh followers" onClick={() => startTransition(async () => { const result = await refreshFollowerCount(profileId, social.id); if (!result.success) return toast.error(result.error); setSocials((current) => current.map((item) => item.id === social.id ? { ...item, followerCount: result.followerCount ?? item.followerCount, followerSource: "connected", followerSyncStatus: "success", followerSyncedAt: new Date().toISOString() } : item)); })}><RefreshCw className="size-4" /></ActionIcon>}<ActionIcon label="Delete social link" danger onClick={() => { setSocials((current) => current.filter((item) => item.id !== social.id)); run(() => deleteSocialLink(profileId, social.id)); }}><Trash2 className="size-4" /></ActionIcon></div>)}<div className="grid gap-3 rounded-xl bg-zinc-50 p-3 sm:grid-cols-2"><div><Label>Provider</Label><Input value={socialDraft.provider} onChange={(event) => setSocialDraft((current) => ({ ...current, provider: event.target.value }))} /></div><div><Label>Follower count</Label><Input type="number" min="0" value={socialDraft.followerCount} onChange={(event) => setSocialDraft((current) => ({ ...current, followerCount: event.target.value }))} /></div><div className="sm:col-span-2"><Label>Profile URL</Label><Input value={socialDraft.url} onChange={(event) => setSocialDraft((current) => ({ ...current, url: event.target.value }))} placeholder="https://…" /></div><Button className="sm:col-span-2 bg-[#8129ff]" onClick={saveSocial}>Add social link</Button></div></div></DialogContent></Dialog>
+    <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}><DialogContent><DialogHeader><DialogTitle>Archive</DialogTitle></DialogHeader>{archive.length ? <div className="space-y-2">{archive.map((item) => <div key={`${item.kind}:${item.id}`} className="flex items-center gap-3 rounded-xl border p-3"><Archive className="size-4 text-zinc-400" /><span className="flex-1 text-sm font-medium">{item.label}</span><Button size="sm" variant="outline" onClick={() => { setArchive((current) => current.filter((candidate) => candidate.id !== item.id)); run(() => archiveEditorItem(item.kind, item.id, false), "Restored"); }}>Restore</Button><ActionIcon label="Delete permanently" danger onClick={() => { if (!window.confirm(`Permanently delete “${item.label}”?`)) return; setArchive((current) => current.filter((candidate) => candidate.id !== item.id)); run(() => item.kind === "collection" ? deleteCollection(item.id) : deleteBlock(item.id), "Deleted"); }}><Trash2 className="size-4" /></ActionIcon></div>)}</div> : <div className="py-12 text-center"><Archive className="mx-auto size-8 text-zinc-300" /><p className="mt-3 text-sm text-zinc-500">Your archive is empty.</p></div>}</DialogContent></Dialog>
+  </div>;
 }

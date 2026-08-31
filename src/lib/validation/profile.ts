@@ -61,6 +61,7 @@ export const profileUpdateSchema = z.object({
   isPublished: z.boolean().optional(),
   showBranding: z.boolean().optional(),
   socialIconPosition: z.enum(["top", "bottom"]).optional(),
+  showFollowerTotal: z.boolean().optional(),
   themeId: z.string().uuid().nullable().optional(),
   designConfig: z.record(z.string(), z.unknown()).optional(),
 });
@@ -112,6 +113,7 @@ export const blockCreateSchema = z.object({
   publishAt: z.coerce.date().optional(),
   expireAt: z.coerce.date().optional(),
   timezone: z.string().max(64).optional(),
+  collectionId: z.string().uuid().nullable().optional(),
 });
 
 export type BlockCreateInput = z.infer<typeof blockCreateSchema>;
@@ -123,6 +125,7 @@ export const blockUpdateSchema = z.object({
   publishAt: z.coerce.date().nullable().optional(),
   expireAt: z.coerce.date().nullable().optional(),
   timezone: z.string().max(64).nullable().optional(),
+  collectionId: z.string().uuid().nullable().optional(),
 });
 
 export type BlockUpdateInput = z.infer<typeof blockUpdateSchema>;
@@ -136,6 +139,7 @@ export const socialLinkSchema = z.object({
   url: z.string().max(2048).refine(isSafeUrl, "URL scheme is not allowed."),
   position: z.number().int().min(0).optional(),
   enabled: z.boolean().default(true),
+  followerCount: z.number().int().min(0).nullable().optional(),
 });
 
 export type SocialLinkInput = z.infer<typeof socialLinkSchema>;

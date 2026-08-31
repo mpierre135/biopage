@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { randomInt } from "node:crypto";
-import { eq, asc, and, sql } from "drizzle-orm";
+import { eq, asc, and, sql, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   profiles,
@@ -10,6 +10,7 @@ import {
   integrations,
   experiments,
   experimentVariants,
+  collections,
 } from "@/lib/db/schema";
 import { themeToCssVars, cssVarsToStyle, buildPageBackgroundStyle, backgroundOverlayStyle } from "@/lib/themes/resolver";
 import { brandConfig } from "@/lib/brand";
@@ -91,13 +92,14 @@ export default async function UsernamePage({ params }: Props) {
 
   if (!profile) notFound();
 
-  const [profileBlocks, profileSocials, profileTheme, pixelRows, runningExp] =
+  const [profileBlocks, profileCollections, profileSocials, profileTheme, pixelRows, runningExp] =
     await Promise.all([
       db
         .select()
         .from(blocks)
-        .where(and(eq(blocks.profileId, profile.id), eq(blocks.enabled, true)))
+        .where(and(eq(blocks.profileId, profile.id), eq(blocks.enabled, true), isNull(blocks.archivedAt)))
         .orderBy(asc(blocks.position)),
+      db.select().from(collections).where(and(eq(collections.profileId, profile.id), eq(collections.enabled, true), isNull(collections.archivedAt))).orderBy(asc(collections.position)),
       db
         .select()
         .from(socialLinks)
@@ -197,17 +199,23 @@ export default async function UsernamePage({ params }: Props) {
             bio: profile.bio,
             profileImage: profile.profileImage,
             showBranding: profile.showBranding,
+            showFollowerTotal: profile.showFollowerTotal,
           }}
           blocks={visibleBlocks.map((b) => ({
             id: b.id,
             type: b.type,
             config: b.config as Record<string, unknown>,
+            position: b.position,
+            collectionId: b.collectionId,
           }))}
           socials={profileSocials.map((s) => ({
             id: s.id,
             provider: s.provider,
             url: s.url,
+            followerCount: s.followerCount,
+            position: s.position,
           }))}
+          collections={profileCollections.map((collection) => ({ id: collection.id, title: collection.title, position: collection.position, enabled: collection.enabled }))}
           themeConfig={themeConfig}
         />
       </div>

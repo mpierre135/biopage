@@ -22,6 +22,7 @@ import { brandConfig } from "@/lib/brand";
 import { getSocialProvider } from "@/lib/social/providers";
 import type { BlockType } from "@/lib/blocks/types";
 import type { ThemeConfig } from "@/lib/themes/types";
+import { getFollowerTotal } from "@/lib/editor/rules";
 
 const SOCIAL_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   globe: Globe,
@@ -65,18 +66,30 @@ type ProfileData = {
   bio: string | null;
   profileImage: string | null;
   showBranding: boolean;
+  showFollowerTotal?: boolean;
 };
 
 type BlockData = {
   id: string;
   type: string;
   config: Record<string, unknown>;
+  position?: number;
+  collectionId?: string | null;
 };
 
 type SocialData = {
   id: string;
   provider: string;
   url: string;
+  followerCount?: number | null;
+  position?: number;
+};
+
+type CollectionData = {
+  id: string;
+  title: string;
+  position: number;
+  enabled?: boolean;
 };
 
 type ProfileViewProps = {
@@ -84,6 +97,8 @@ type ProfileViewProps = {
   blocks: BlockData[];
   socials: SocialData[];
   themeConfig: ThemeConfig;
+  collections?: CollectionData[];
+  preview?: boolean;
 };
 
 export function ProfileView({
@@ -91,6 +106,8 @@ export function ProfileView({
   blocks,
   socials,
   themeConfig,
+  collections = [],
+  preview = false,
 }: ProfileViewProps) {
   const avatarSize = themeConfig.layout?.avatarSize ?? "96px";
   const maxWidth = themeConfig.layout?.containerMaxWidth ?? "28rem";
@@ -98,6 +115,11 @@ export function ProfileView({
   const textColor = themeConfig.colors?.text ?? "#1e293b";
   const textMuted = themeConfig.colors?.textMuted ?? "#64748b";
   const primaryColor = themeConfig.colors?.primary ?? "#6366f1";
+  const totalFollowers = getFollowerTotal(socials);
+  const topLevel = [
+    ...blocks.filter((block) => !block.collectionId).map((block) => ({ kind: "block" as const, id: block.id, position: block.position ?? 0 })),
+    ...collections.map((collection) => ({ kind: "collection" as const, id: collection.id, position: collection.position })),
+  ].sort((a, b) => a.position - b.position);
 
   return (
     <div
@@ -147,6 +169,11 @@ export function ProfileView({
             {profile.bio}
           </p>
         )}
+        {profile.showFollowerTotal && totalFollowers > 0 && (
+          <p className="mt-2 text-xs font-medium" style={{ color: textMuted }}>
+            {new Intl.NumberFormat("en-US", { notation: "compact" }).format(totalFollowers)} followers
+          </p>
+        )}
       </div>
 
       {/* Social links */}
@@ -173,15 +200,31 @@ export function ProfileView({
 
       {/* Blocks */}
       <div className="mt-6" style={{ display: "flex", flexDirection: "column", gap: blockGap }}>
-        {blocks.map((block) => (
-          <BlockRenderer
-            key={block.id}
-            type={block.type as BlockType}
-            config={block.config}
-            blockId={block.id}
-            profileUsername={profile.username}
-          />
-        ))}
+        {topLevel.map((item) => {
+          if (item.kind === "block") {
+            const block = blocks.find((candidate) => candidate.id === item.id);
+            return block ? (
+              <div key={block.id} className={preview ? "pointer-events-none" : undefined}>
+                <BlockRenderer type={block.type as BlockType} config={block.config} blockId={block.id} profileUsername={profile.username} />
+              </div>
+            ) : null;
+          }
+          const collection = collections.find((candidate) => candidate.id === item.id);
+          if (!collection || collection.enabled === false) return null;
+          const members = blocks.filter((block) => block.collectionId === collection.id).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+          return (
+            <section key={collection.id} className="overflow-hidden rounded-[var(--bh-card-radius,16px)] border border-[var(--bh-card-border,#e5e7eb)] bg-[var(--bh-card-bg,#fff)] p-3 shadow-[var(--bh-card-shadow,none)]">
+              <h2 className="px-2 py-3 text-center text-sm font-semibold" style={{ color: textColor }}>{collection.title}</h2>
+              <div className="grid gap-3">
+                {members.map((block) => (
+                  <div key={block.id} className={preview ? "pointer-events-none" : undefined}>
+                    <BlockRenderer type={block.type as BlockType} config={block.config} blockId={block.id} profileUsername={profile.username} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       {/* Branding */}

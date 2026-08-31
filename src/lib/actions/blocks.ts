@@ -108,6 +108,7 @@ export async function createBlock(
       publishAt: parsed.data.publishAt ?? null,
       expireAt: parsed.data.expireAt ?? null,
       timezone: parsed.data.timezone ?? null,
+      collectionId: parsed.data.collectionId ?? null,
     })
     .returning({ id: blocks.id });
 
@@ -155,6 +156,7 @@ export async function updateBlock(
   if (parsed.data.publishAt !== undefined) updateData.publishAt = parsed.data.publishAt;
   if (parsed.data.expireAt !== undefined) updateData.expireAt = parsed.data.expireAt;
   if (parsed.data.timezone !== undefined) updateData.timezone = parsed.data.timezone;
+  if (parsed.data.collectionId !== undefined) updateData.collectionId = parsed.data.collectionId;
 
   await db.update(blocks).set(updateData).where(eq(blocks.id, blockId));
 
